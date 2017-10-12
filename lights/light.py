@@ -7,6 +7,7 @@ myMQTTClient = None
 control_condition_var = threading.Condition()
 control_timestamp = None
 device_id = "thing1"  # Todo: should be an environment var
+device_location = 1  # Todo: should be an environment var
 control_timer = 10  # Todo: should be an environment var
 cleanup_margin = 5  # Todo: should be an environment var
 cleanup_network_devices_thread = None
@@ -94,7 +95,7 @@ def send_control():
 
 
 def get_location():  # TODO: implement location function
-	return '1'
+	return device_location
 
 
 def mqtt_connect():
