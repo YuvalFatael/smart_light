@@ -2,7 +2,7 @@ from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
 def customCallback(client, userdata, message):
 	print("Received a new message: ")
-	print(message.payload)
+	print(message.payload.decode("utf-8"))
 	print("from topic: ")
 	print(message.topic)
 	print("--------------\n\n")
@@ -17,7 +17,7 @@ myMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
 myMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
 
 myMQTTClient.connect()
-myMQTTClient.subscribe("test", 1, customCallback)
+myMQTTClient.subscribe("control", 1, customCallback)
 
 while True:
     pass
