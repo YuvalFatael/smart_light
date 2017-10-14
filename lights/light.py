@@ -18,6 +18,13 @@ network_devices = []
 
 def control_message_heandler(client, userdata, message):
 	global control_timestamp
+	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
+	message_device_id = control_msg[0]
+	message_device_location = control_msg[1]
+	# Got the control message I sent
+	if message_device_id == device_id:
+		return
+
 	# Check if we need to send a control message or we just sent one
 	if control_timestamp is None or time.time()-control_timestamp > 10:
 		send_control()
@@ -26,8 +33,7 @@ def control_message_heandler(client, userdata, message):
 			control_message_thread.start()
 
 	# Update network devices
-	control_msg = message.payload.strip(',')  # Control message structure: 'deviceID,deviceLocation'
-	network_devices.append(control_msg[0], control_msg[1], time.time())
+	network_devices.append((message_device_id, message_device_location, time.time()))
 
 	# Update Neighbors
 	update_neighbors()
@@ -43,7 +49,8 @@ def update_neighbors():
 	right_neighbor_distance = 0
 	left_neighbor_distance = 0
 	for network_device_id, network_device_location, _ in network_devices:
-		distance = float(get_location()) - network_device_location
+		print(network_devices)
+		distance = float(get_location()) - float(network_device_location)
 		if distance > 0 and right_neighbor_distance == 0:
 			right_neighbor_distance = distance
 			right_neighbor = (network_device_id, distance)
@@ -90,7 +97,7 @@ def send_control_thread_func():
 
 def send_control():
 	global control_timestamp
-	myMQTTClient.publish("control", "{},{}".format(device_id, get_location()), 0)
+	myMQTTClient.publish("control", "{},{}".format(device_id, get_location()), 1)
 	control_timestamp = time.time()
 
 
@@ -133,7 +140,10 @@ def main():
 
 	# Create Control Message thread
 	control_message_thread = threading.Thread(target=send_control_thread_func)
-	cleanup_network_devices_thread.start()
+	control_message_thread.start()
+
+	while True:
+		pass
 
 if __name__ == '__main__':
 	main()
