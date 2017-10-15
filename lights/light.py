@@ -1,45 +1,75 @@
 import threading
 import time
+import logging
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
 
 # Global Vars
+logger = None
 myMQTTClient = None
 control_condition_var = threading.Condition()
 control_timestamp = None
-device_id = "thing1"  # Todo: should be an environment var
+device_id = "light1"  # Todo: should be an environment var
 device_location = 1  # Todo: should be an environment var
-control_timer = 10  # Todo: should be an environment var
-cleanup_margin = 5  # Todo: should be an environment var
+control_timer = 20  # Todo: should be an environment var
+cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
 cleanup_network_devices_thread = None
 control_message_thread = None
 network_neighbors = {'Left': None, 'Right': None}
-network_devices = []
+network_devices = {}  # Todo: replace tuples (device_id, device_location, device_update_time) with dictionaries
+send_control_lock = threading.Lock()
+
+
+class StoppableThread(threading.Thread):
+	def __init__(self, function):
+		self.running = False
+		self.function = function
+		super(StoppableThread, self).__init__()
+
+	def start(self):
+		self.running = True
+		super(StoppableThread, self).start()
+
+	def run(self):
+		while self.running:
+			self.function()
+
+	def stop(self):
+		self.running = False
 
 
 def control_message_heandler(client, userdata, message):
-	global control_timestamp
+	global control_timestamp, control_message_thread
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
 	message_device_id = control_msg[0]
 	message_device_location = control_msg[1]
+
 	# Got the control message I sent
 	if message_device_id == device_id:
 		return
 
+	logger.debug('%s received control from %s', device_id, message_device_id)
+
 	# Check if we need to send a control message or we just sent one
-	if control_timestamp is None or time.time()-control_timestamp > 10:
+	if control_timestamp is None or time.time() - control_timestamp > 10:  # can't resend messages faster
+		logger.debug('%s sending control to new device %s', device_id, message_device_id)
 		send_control()
-		if control_message_thread is not None:
-			control_message_thread.stop()
-			control_message_thread.start()
+		#if control_message_thread is not None:
+		#	control_message_thread.stop()
+		#	control_message_thread = StoppableThread(send_control_thread_func)
+		#	control_message_thread.start()
 
+	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
-	network_devices.append((message_device_id, message_device_location, time.time()))
+	message_device_info = (message_device_id, message_device_location, time.time())
+	network_devices[message_device_id] = message_device_info
+	# Check if network devices should be updated
+	if old_message_device_info is None or old_message_device_info[1] != message_device_location:
+		# Update Neighbors
+		update_neighbors()
 
-	# Update Neighbors
-	update_neighbors()
 
-
-def event_message_handler(client, userdata, message): # TODO: implement event message handler
+def event_message_handler(client, userdata, message):  # TODO: implement event message handler
 	pass
 
 
@@ -48,8 +78,7 @@ def update_neighbors():
 	left_neighbor = None
 	right_neighbor_distance = 0
 	left_neighbor_distance = 0
-	for network_device_id, network_device_location, _ in network_devices:
-		print(network_devices)
+	for network_device_id, network_device_location, _ in network_devices.values():
 		distance = float(get_location()) - float(network_device_location)
 		if distance > 0 and right_neighbor_distance == 0:
 			right_neighbor_distance = distance
@@ -64,19 +93,20 @@ def update_neighbors():
 			left_neighbor_distance = distance
 			left_neighbor = (network_device_id, distance)
 
-	if right_neighbor is not None:
-		network_neighbors['Right'] = right_neighbor
+	network_neighbors['Right'] = right_neighbor
+	logger.debug('%s set right_neighbor %s', device_id, right_neighbor)
 
-	if left_neighbor is not None:
-		network_neighbors['Left'] = left_neighbor
+	network_neighbors['Left'] = left_neighbor
+	logger.debug('%s set left_neighbor %s', device_id, left_neighbor)
 
 
 def cleanup_neighbors():
 	flag = 0
-	for device in network_devices:
-		_, _, network_device_update_time = device
-		if time.time() - network_device_update_time > control_timer + 5:
-			network_devices.remove(device)
+	for iter_device_id in list(network_devices):
+		_, _, network_device_update_time = network_devices[iter_device_id]
+		if time.time() - network_device_update_time > control_timer + 10:
+			del network_devices[iter_device_id]
+			logger.debug('%s removed offline device %s', device_id, iter_device_id)
 			flag = 1
 
 	if flag == 1:
@@ -84,9 +114,8 @@ def cleanup_neighbors():
 
 
 def cleanup_network_thread_func():
-	while True:
-		time.sleep(control_timer + cleanup_margin)
-		cleanup_neighbors()
+	time.sleep(control_timer * cleanup_margin)
+	cleanup_neighbors()
 
 
 def send_control_thread_func():
@@ -97,8 +126,14 @@ def send_control_thread_func():
 
 def send_control():
 	global control_timestamp
-	myMQTTClient.publish("control", "{},{}".format(device_id, get_location()), 1)
+	send_control_lock.acquire()
+	try:
+		myMQTTClient.publish("control", "{},{}".format(device_id, get_location()), 1)
+	except publishTimeoutException:
+		logger.error('%s got TIMEOUT', device_id)
+	send_control_lock.release()
 	control_timestamp = time.time()
+	logger.debug('%s sent control with locaiton: %s', device_id, device_location)
 
 
 def get_location():  # TODO: implement location function
@@ -108,10 +143,10 @@ def get_location():  # TODO: implement location function
 def mqtt_connect():
 	global myMQTTClient
 	# For certificate based connection
-	myMQTTClient = AWSIoTMQTTClient("light")  # Todo: all these should be environment vars ?
+	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
 	# For TLS mutual authentication
 	myMQTTClient.configureEndpoint("audsodu4ke8z4.iot.us-west-2.amazonaws.com", 8883)
-	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/private.key", "certs/cert.pem")
+	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id), "certs/{}.cert.pem".format(device_id))
 
 	myMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
 	myMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
@@ -126,20 +161,30 @@ def mqtt_connect():
 
 
 def main():
-	global cleanup_network_devices_thread, control_message_thread
+	global cleanup_network_devices_thread, control_message_thread, logger
+
+	# Logging congif
+	logger = logging.getLogger('smart_light')
+	handler = logging.StreamHandler()
+	formatter = logging.Formatter(
+		'%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+	handler.setFormatter(formatter)
+	logger.addHandler(handler)
+	logger.setLevel(logging.DEBUG)
 
 	# Connect to Amazon's MQTT service
 	mqtt_connect()
+	logger.debug('%s connected', device_id)
 
 	# Send Control Message
 	send_control()
 
 	# Create Cleanup Network thread
-	cleanup_network_devices_thread = threading.Thread(target=cleanup_network_thread_func)
+	cleanup_network_devices_thread = StoppableThread(cleanup_network_thread_func)
 	cleanup_network_devices_thread.start()
 
 	# Create Control Message thread
-	control_message_thread = threading.Thread(target=send_control_thread_func)
+	control_message_thread = StoppableThread(send_control_thread_func)
 	control_message_thread.start()
 
 	while True:
