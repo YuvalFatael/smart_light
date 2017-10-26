@@ -58,16 +58,16 @@ def update_neighbors():
 	left_neighbor_distance = 0
 	for network_device_id, network_device_location, _ in network_devices.values():
 		distance = float(get_location()) - float(network_device_location)
-		if distance > 0 and right_neighbor_distance == 0:
+		if distance < 0 and right_neighbor_distance == 0:
 			right_neighbor_distance = distance
 			right_neighbor = (network_device_id, distance)
-		elif distance < 0 and left_neighbor_distance == 0:
+		elif distance > 0 and left_neighbor_distance == 0:
 			left_neighbor_distance = distance
 			left_neighbor = (network_device_id, distance)
-		elif 0 < distance < right_neighbor_distance:
+		elif 0 > distance > right_neighbor_distance:
 			right_neighbor_distance = distance
 			right_neighbor = (network_device_id, distance)
-		elif 0 > distance > left_neighbor_distance:
+		elif 0 < distance < left_neighbor_distance:
 			left_neighbor_distance = distance
 			left_neighbor = (network_device_id, distance)
 
