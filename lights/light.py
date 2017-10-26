@@ -11,7 +11,7 @@ control_condition_var = threading.Condition()
 control_timestamp = None
 device_id = "light1"  # Todo: should be an environment var
 device_location = 1  # Todo: should be an environment var
-control_timer = 20  # Todo: should be an environment var
+control_timer = 30  # Todo: should be an environment var
 cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
 cleanup_network_devices_thread = None
 control_message_thread = None
@@ -33,10 +33,9 @@ def control_message_heandler(client, userdata, message):
 	logger.debug('%s received control from %s', device_id, message_device_id)
 
 	# Check if we need to send a control message or we just sent one
-	if control_timestamp is None or time.time() - control_timestamp > 10:  # can't resend messages faster
+	if control_timestamp is None or message_device_id not in network_devices or time.time() - control_timestamp > 10:  # can't resend messages faster
 		logger.debug('%s sending control to new device %s', device_id, message_device_id)
 		send_control()
-
 
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
