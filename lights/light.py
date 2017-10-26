@@ -35,7 +35,7 @@ def control_message_heandler(client, userdata, message):
 	# Check if we need to send a control message or we just sent one
 	if control_timestamp is None or message_device_id not in network_devices or time.time() - control_timestamp > 10:  # can't resend messages faster
 		logger.debug('%s sending control to new device %s', device_id, message_device_id)
-		send_control()
+		threading.Thread(target=send_control).start()
 
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
@@ -97,11 +97,12 @@ def cleanup_network_thread_func():
 
 
 def send_control_thread_func():
+	global control_timestamp
 	while True:
 		time.sleep(1)
 		if time.time() - control_timestamp >= control_timer:
 			logger.debug('%s sending control from send_control_thread', device_id)
-			send_control()
+			threading.Thread(target=send_control).start()
 
 
 def send_control():
