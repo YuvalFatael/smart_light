@@ -20,24 +20,6 @@ network_devices = {}  # Todo: replace tuples (device_id, device_location, device
 send_control_lock = threading.Lock()
 
 
-class StoppableThread(threading.Thread):
-	def __init__(self, function):
-		self.running = False
-		self.function = function
-		super(StoppableThread, self).__init__()
-
-	def start(self):
-		self.running = True
-		super(StoppableThread, self).start()
-
-	def run(self):
-		while self.running:
-			self.function()
-
-	def stop(self):
-		self.running = False
-
-
 def control_message_heandler(client, userdata, message):
 	global control_timestamp, control_message_thread
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
@@ -54,10 +36,7 @@ def control_message_heandler(client, userdata, message):
 	if control_timestamp is None or time.time() - control_timestamp > 10:  # can't resend messages faster
 		logger.debug('%s sending control to new device %s', device_id, message_device_id)
 		send_control()
-		#if control_message_thread is not None:
-		#	control_message_thread.stop()
-		#	control_message_thread = StoppableThread(send_control_thread_func)
-		#	control_message_thread.start()
+
 
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
@@ -120,19 +99,21 @@ def cleanup_network_thread_func():
 
 def send_control_thread_func():
 	while True:
-		time.sleep(control_timer)
-		send_control()
+		time.sleep(1)
+		if time.time() - control_timestamp >= control_timer:
+			logger.debug('%s sending control from send_control_thread', device_id)
+			send_control()
 
 
 def send_control():
 	global control_timestamp
 	send_control_lock.acquire()
+	control_timestamp = time.time()
 	try:
 		myMQTTClient.publish("control", "{},{}".format(device_id, get_location()), 1)
 	except publishTimeoutException:
 		logger.error('%s got TIMEOUT', device_id)
 	send_control_lock.release()
-	control_timestamp = time.time()
 	logger.debug('%s sent control with locaiton: %s', device_id, device_location)
 
 
@@ -180,11 +161,11 @@ def main():
 	send_control()
 
 	# Create Cleanup Network thread
-	cleanup_network_devices_thread = StoppableThread(cleanup_network_thread_func)
+	cleanup_network_devices_thread = threading.Thread(target=cleanup_network_thread_func)
 	cleanup_network_devices_thread.start()
 
 	# Create Control Message thread
-	control_message_thread = StoppableThread(send_control_thread_func)
+	control_message_thread = threading.Thread(target=send_control_thread_func)
 	control_message_thread.start()
 
 	while True:
