@@ -82,7 +82,7 @@ def cleanup_neighbors():
 	flag = 0
 	for iter_device_id in list(network_devices):
 		_, _, network_device_update_time = network_devices[iter_device_id]
-		if time.time() - network_device_update_time > control_timer + 10:
+		if time.time() - network_device_update_time > control_timer * cleanup_margin:
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
 			flag = 1
@@ -92,8 +92,9 @@ def cleanup_neighbors():
 
 
 def cleanup_network_thread_func():
-	time.sleep(control_timer * cleanup_margin)
-	cleanup_neighbors()
+	while True:
+		time.sleep(control_timer / 2)
+		cleanup_neighbors()
 
 
 def send_control_thread_func():
