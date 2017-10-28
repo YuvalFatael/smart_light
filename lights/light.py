@@ -140,8 +140,6 @@ def mqtt_connect():
 	myMQTTClient.connect() 	# Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_heandler)
 	myMQTTClient.subscribe("events", 1, event_message_handler)
-	# myMQTTClient.unsubscribe("test")
-	#myMQTTClient.disconnect()
 
 
 def main():
