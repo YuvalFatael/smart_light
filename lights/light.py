@@ -20,7 +20,7 @@ network_devices = {}  # {'id': device_id, 'location': device_location, 'time': d
 send_control_lock = threading.Lock()
 
 
-def control_message_heandler(client, userdata, message):
+def control_message_handler(client, userdata, message):
 	global control_timestamp, control_message_thread
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
 	message_device_id = control_msg[0]
@@ -138,7 +138,7 @@ def mqtt_connect():
 	myMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
 
 	myMQTTClient.connect() 	# Todo: try catch?
-	myMQTTClient.subscribe("control", 1, control_message_heandler)
+	myMQTTClient.subscribe("control", 1, control_message_handler)
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
 
