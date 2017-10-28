@@ -16,7 +16,7 @@ cleanup_margin = 2  # number of control_timer times  # Todo: should be an enviro
 cleanup_network_devices_thread = None
 control_message_thread = None
 network_neighbors = {'Left': None, 'Right': None}
-network_devices = {}  # Todo: replace tuples (device_id, device_location, device_update_time) with dictionaries
+network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
 send_control_lock = threading.Lock()
 
 
@@ -39,10 +39,10 @@ def control_message_heandler(client, userdata, message):
 
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
-	message_device_info = (message_device_id, message_device_location, time.time())
+	message_device_info = {'id': message_device_id, 'location': message_device_location, 'time': time.time()}
 	network_devices[message_device_id] = message_device_info
 	# Check if network devices should be updated
-	if old_message_device_info is None or old_message_device_info[1] != message_device_location:
+	if old_message_device_info is None or old_message_device_info['location'] != message_device_location:
 		# Update Neighbors
 		update_neighbors()
 
@@ -56,7 +56,9 @@ def update_neighbors():
 	left_neighbor = None
 	right_neighbor_distance = 0
 	left_neighbor_distance = 0
-	for network_device_id, network_device_location, _ in network_devices.values():
+	for device in network_devices.values():
+		network_device_id = device['id']
+		network_device_location = device['location']
 		distance = float(get_location()) - float(network_device_location)
 		if distance < 0 and right_neighbor_distance == 0:
 			right_neighbor_distance = distance
@@ -81,7 +83,7 @@ def update_neighbors():
 def cleanup_neighbors():
 	flag = 0
 	for iter_device_id in list(network_devices):
-		_, _, network_device_update_time = network_devices[iter_device_id]
+		network_device_update_time = network_devices[iter_device_id]['time']
 		if time.time() - network_device_update_time > control_timer * cleanup_margin:
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
