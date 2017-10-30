@@ -54,6 +54,13 @@ def cleanup_neighbors():
 	for iter_device_id in list(network_devices):
 		network_device_update_time = network_devices[iter_device_id]['time']
 		if time.time() - network_device_update_time > control_timer * cleanup_margin:
+			update_time = time.time()
+			update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
+			event = {'id': network_devices[iter_device_id]['id'],
+					 'event': '{} disconnected from network'.format(network_devices[iter_device_id]['id']),
+					 'time': update_time,
+					 'time_str': update_time_str}
+			network_events.append(event)
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
 
