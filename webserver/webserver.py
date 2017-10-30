@@ -1,9 +1,10 @@
 import logging
 import time
 import threading
+import datetime
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from flask import Flask, render_template
-
+from operator import itemgetter
 
 # Global Vars
 device_id = 'webserver'
@@ -28,9 +29,13 @@ def control_message_handler(client, userdata, message):
 
 	logger.debug('%s received control from %s', device_id, message_device_id)
 
-	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
-	message_device_info = {'id': message_device_id, 'location': message_device_location, 'time': time.time()}
+	update_time = time.time()
+	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
+	message_device_info = {'id': message_device_id,
+						   'location': message_device_location,
+						   'time': update_time,
+						   'time_str': update_time_str}
 	network_devices[message_device_id] = message_device_info
 	logger.debug('%s updated network_devices: %s', device_id, str(message_device_info))
 
@@ -59,22 +64,24 @@ def mqtt_connect():
 	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
 	# For TLS mutual authentication
 	myMQTTClient.configureEndpoint("audsodu4ke8z4.iot.us-west-2.amazonaws.com", 8883)
-	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id), "certs/{}.cert.pem".format(device_id))
+	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id),
+									  "certs/{}.cert.pem".format(device_id))
 
 	myMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
 	myMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
 	myMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
 	myMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
 
-	myMQTTClient.connect() 	# Todo: try catch?
+	myMQTTClient.connect()  # Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_handler)
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
 
 @app.route("/")
 def page():
-	events_list = {'device1': 'connect', 'device2' : 'connect'}
-	return render_template('page.html', events=events_list)
+	events_list = {'device1': 'connect', 'device2': 'connect'}
+	network_devices_list_sorted = sorted(network_devices.values(), key=itemgetter('location'), reverse=False)
+	return render_template('page.html', events=events_list, devices=network_devices_list_sorted, num_devices=len(network_devices_list_sorted) + 1)
 
 
 def main():

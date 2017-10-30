@@ -6,24 +6,37 @@
 .tg  {border-collapse:collapse;border-spacing:0;border-color:#aabcfe;width: 50%;}
 .tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#669;background-color:#e8edff;}
 .tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#039;background-color:#b9c9fe;}
-.tg .tg-baqh{text-align:center;vertical-align:top;text-align:center;}
-.tg .tg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:center;}
+.tg .tg-baqh{text-align:center;vertical-align:top;text-align:center;font-weight: bold;}
+.tg .tg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:center;font-weight: bold;}
 .tg .tg-yw4l{vertical-align:top;}
 
 .tgg  {border-collapse:collapse;border-spacing:0;border-color:#aabcfe;}
 .tgg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#669;background-color:#e8edff;}
 .tgg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#039;background-color:#b9c9fe;}
-.tgg .tgg-baqh{text-align:center;vertical-align:top;text-align:center;}
-.tgg .tgg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:center;}
-.tgg .tgg-yw4l{vertical-align:top;}
+.tgg .tgg-baqh{text-align:center;vertical-align:top;text-align:center;font-weight: bold;}
+.tgg .tgg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:left;font-weight: bold;}
+.tgg .tgg-yw4l{vertical-align:top;text-align:center;}
 </style>
 <table class="tgg">
   <tr>
-    <th class="tgg-baqh" colspan="2">Connected Devices</th>
+    <th class="tgg-baqh" colspan="{{ num_devices }}" + 1>Connected Devices</th>
   </tr>
-  <tr>
-  {% for key, value in events.items() %}
-    <td class="tgg-yw4l">{{ key }}</td>
+	  <tr>
+	  <td class="tgg-6k2t">Device ID</td>
+{% for device in devices %}
+	  <td class="tgg-yw4l">{{ device.id }}</td>
+{% endfor %}
+	  </tr>
+	  <tr>
+	  <td class="tgg-6k2t">Device Location</td>
+{% for device in devices %}
+	  <td class="tgg-yw4l">{{ device.location }}</td>
+{% endfor %}
+	  </tr>
+	  <tr>
+	  <td class="tgg-6k2t">Last Update time</td>
+{% for device in devices %}
+	   <td class="tgg-yw4l">{{ device.time_str }}</td>
 {% endfor %}
   </tr>
 </table>
