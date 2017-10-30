@@ -2,20 +2,24 @@ import logging
 import time
 import threading
 import datetime
+from configparser import ConfigParser
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from flask import Flask, render_template, redirect
 from operator import itemgetter
 
 # Global Vars
-device_id = 'webserver'
 app = Flask(__name__)
 logger = None
 myMQTTClient = None
 network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
 network_events = []
-control_timer = 30  # Todo: should be an environment var
-cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
+device_id = None
+control_timer = None
+cleanup_margin = None  # number of control_timer times
 cleanup_network_devices_thread = None
+endpoint_url = None
+endpoint_port = None
+config_filename = 'config.ini'
 
 
 def control_message_handler(client, userdata, message):
@@ -89,7 +93,6 @@ def mqtt_connect():
 	myMQTTClient.subscribe("control", 1, control_message_handler)
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
-
 @app.route("/clear")
 def clear():
 	global network_events
@@ -104,8 +107,22 @@ def page():
 						   num_devices=len(network_devices_list_sorted) + 1)
 
 
+def get_config():
+	global device_id, control_timer, cleanup_margin, endpoint_url, endpoint_port
+	parser = ConfigParser()
+	parser.read(config_filename)
+	device_id = parser.get('light', 'device_id')
+	control_timer = int(parser.get('light', 'control_timer'))
+	cleanup_margin = int(parser.get('light', 'cleanup_margin'))
+	endpoint_url = parser.get('mqtt', 'endpoint_url')
+	endpoint_port = int(parser.get('mqtt', 'endpoint_port'))
+
+
 def main():
 	global logger, cleanup_network_devices_thread
+
+	# Get Config Parameters
+	get_config()
 
 	# Logging congif
 	logger = logging.getLogger('smart_light')
