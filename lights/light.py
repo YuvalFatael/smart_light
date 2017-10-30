@@ -2,6 +2,8 @@ import threading
 import time
 import logging
 import datetime
+import pyimgur
+from configparser import ConfigParser
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
 
@@ -10,15 +12,18 @@ logger = None
 myMQTTClient = None
 control_condition_var = threading.Condition()
 control_timestamp = None
-device_id = "light1"  # Todo: should be an environment var
-device_location = 1  # Todo: should be an environment var
-control_timer = 30  # Todo: should be an environment var
-cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
+device_id = None
+device_location = None
+control_timer = None
+cleanup_margin = None  # number of control_timer times
 cleanup_network_devices_thread = None
 control_message_thread = None
 network_neighbors = {'Left': None, 'Right': None}
 network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
 send_control_lock = threading.Lock()
+config_filename = 'config.ini'
+endpoint_url = None
+endpoint_port = None
 
 
 def control_message_handler(client, userdata, message):
@@ -135,7 +140,7 @@ def mqtt_connect():
 	# For certificate based connection
 	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
 	# For TLS mutual authentication
-	myMQTTClient.configureEndpoint("audsodu4ke8z4.iot.us-west-2.amazonaws.com", 8883)
+	myMQTTClient.configureEndpoint(endpoint_url, endpoint_port)
 	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id), "certs/{}.cert.pem".format(device_id))
 
 	myMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
@@ -148,8 +153,26 @@ def mqtt_connect():
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
 
+def imgur_connect():
+	pass
+
+
+def get_config():
+	global device_id, device_location, control_timer, cleanup_margin, endpoint_url, endpoint_port
+	parser = ConfigParser()
+	parser.read(config_filename)
+	device_id = parser.get('light', 'device_id')
+	device_location = int(parser.get('light', 'device_location'))
+	control_timer = int(parser.get('light', 'control_timer'))
+	cleanup_margin = int(parser.get('light', 'cleanup_margin'))
+	endpoint_url = parser.get('mqtt', 'endpoint_url')
+	endpoint_port = int(parser.get('mqtt', 'endpoint_port'))
+
 def main():
 	global cleanup_network_devices_thread, control_message_thread, logger
+
+	# Get Config Parameters
+	get_config()
 
 	# Logging congif
 	logger = logging.getLogger('smart_light')
