@@ -24,6 +24,8 @@ send_control_lock = threading.Lock()
 config_filename = 'config.ini'
 endpoint_url = None
 endpoint_port = None
+imgur_client = None
+imgur_client_id = None
 
 
 def control_message_handler(client, userdata, message):
@@ -154,11 +156,12 @@ def mqtt_connect():
 
 
 def imgur_connect():
-	pass
+	global imgur_client
+	imgur_client = pyimgur.Imgur(imgur_client_id)
 
 
 def get_config():
-	global device_id, device_location, control_timer, cleanup_margin, endpoint_url, endpoint_port
+	global device_id, device_location, control_timer, cleanup_margin, endpoint_url, endpoint_port, imgur_client_id, imgur_client_secret
 	parser = ConfigParser()
 	parser.read(config_filename)
 	device_id = parser.get('light', 'device_id')
@@ -167,6 +170,8 @@ def get_config():
 	cleanup_margin = int(parser.get('light', 'cleanup_margin'))
 	endpoint_url = parser.get('mqtt', 'endpoint_url')
 	endpoint_port = int(parser.get('mqtt', 'endpoint_port'))
+	imgur_client_id = parser.get('imgur', 'imgur_client_id')
+
 
 def main():
 	global cleanup_network_devices_thread, control_message_thread, logger
@@ -186,6 +191,10 @@ def main():
 	# Connect to Amazon's MQTT service
 	mqtt_connect()
 	logger.debug('%s connected', device_id)
+
+	# Connect to Imgur
+	imgur_connect()
+	# uploaded_image = imgur_client.upload_image('path_to_image', title="Uploaded with PyImgur")
 
 	# Send Control Message
 	send_control()
