@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+   <body>
+   
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;border-color:#aabcfe;width: 50%;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#669;background-color:#e8edff;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#039;background-color:#b9c9fe;}
+.tg .tg-baqh{text-align:center;vertical-align:top;text-align:center;}
+.tg .tg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:center;}
+.tg .tg-yw4l{vertical-align:top;}
+
+.tgg  {border-collapse:collapse;border-spacing:0;border-color:#aabcfe;}
+.tgg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#669;background-color:#e8edff;}
+.tgg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#aabcfe;color:#039;background-color:#b9c9fe;}
+.tgg .tgg-baqh{text-align:center;vertical-align:top;text-align:center;}
+.tgg .tgg-6k2t{background-color:#D2E4FC;vertical-align:top;text-align:center;}
+.tgg .tgg-yw4l{vertical-align:top;}
+</style>
+<table class="tgg">
+  <tr>
+    <th class="tgg-baqh" colspan="2">Connected Devices</th>
+  </tr>
+  <tr>
+  {% for key, value in events.items() %}
+    <td class="tgg-yw4l">{{ key }}</td>
+{% endfor %}
+  </tr>
+</table>
+
+<br><br><br><br>
+
+<table class="tg">
+  <tr>
+    <th class="tg-baqh" colspan="2">Logs</th>
+  </tr>
+  <tr>
+    <td class="tg-6k2t">Device ID</td>
+    <td class="tg-6k2t">Event</td>
+  </tr>
+ {% for key, value in events.items() %}
+  <tr>
+    <td class="tg-yw4l">{{ key }}</td>
+    <td class="tg-yw4l">{{ value }}</td>
+  </tr>
+{% endfor %}
+</table>
+      
+   </body>
+</html>

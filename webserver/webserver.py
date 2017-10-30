@@ -2,15 +2,19 @@ import logging
 import time
 import threading
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+from flask import Flask, render_template
+
 
 # Global Vars
 device_id = 'webserver'
+app = Flask(__name__)
 logger = None
 myMQTTClient = None
 network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
 control_timer = 30  # Todo: should be an environment var
 cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
 cleanup_network_devices_thread = None
+
 
 def control_message_handler(client, userdata, message):
 	global control_timestamp, control_message_thread
@@ -67,6 +71,12 @@ def mqtt_connect():
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
 
+@app.route("/")
+def page():
+	events_list = {'device1': 'connect', 'device2' : 'connect'}
+	return render_template('page.html', events=events_list)
+
+
 def main():
 	global logger, cleanup_network_devices_thread
 
@@ -87,8 +97,9 @@ def main():
 	cleanup_network_devices_thread = threading.Thread(target=cleanup_network_thread_func)
 	cleanup_network_devices_thread.start()
 
-	while True:
-		pass
+	# Run webserver
+	app.run()
+
 
 if __name__ == '__main__':
 	main()
