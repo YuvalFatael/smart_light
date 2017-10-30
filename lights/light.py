@@ -1,6 +1,7 @@
 import threading
 import time
 import logging
+import datetime
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
 
@@ -39,7 +40,12 @@ def control_message_handler(client, userdata, message):
 
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
-	message_device_info = {'id': message_device_id, 'location': message_device_location, 'time': time.time()}
+	update_time = time.time()
+	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
+	message_device_info = {'id': message_device_id,
+						   'location': message_device_location,
+						   'time': update_time,
+						   'time_str': update_time_str}
 	network_devices[message_device_id] = message_device_info
 	# Check if network devices should be updated
 	if old_message_device_info is None or old_message_device_info['location'] != message_device_location:
