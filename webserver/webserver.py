@@ -3,7 +3,7 @@ import time
 import threading
 import datetime
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect
 from operator import itemgetter
 
 # Global Vars
@@ -12,13 +12,13 @@ app = Flask(__name__)
 logger = None
 myMQTTClient = None
 network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
+network_events = []
 control_timer = 30  # Todo: should be an environment var
 cleanup_margin = 2  # number of control_timer times  # Todo: should be an environment var
 cleanup_network_devices_thread = None
 
 
 def control_message_handler(client, userdata, message):
-	global control_timestamp, control_message_thread
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
 	message_device_id = control_msg[0]
 	message_device_location = control_msg[1]
@@ -36,6 +36,12 @@ def control_message_handler(client, userdata, message):
 						   'location': message_device_location,
 						   'time': update_time,
 						   'time_str': update_time_str}
+	if message_device_id not in network_devices.keys():
+		event = {'id': message_device_id,
+				 'event': '{} connected to network'.format(message_device_id),
+				 'time': update_time,
+				 'time_str': update_time_str}
+		network_events.append(event)
 	network_devices[message_device_id] = message_device_info
 	logger.debug('%s updated network_devices: %s', device_id, str(message_device_info))
 
@@ -77,11 +83,18 @@ def mqtt_connect():
 	myMQTTClient.subscribe("events", 1, event_message_handler)
 
 
+@app.route("/clear")
+def clear():
+	global network_events
+	network_events = []
+	return redirect("/", code=302)
+
+
 @app.route("/")
 def page():
-	events_list = {'device1': 'connect', 'device2': 'connect'}
 	network_devices_list_sorted = sorted(network_devices.values(), key=itemgetter('location'), reverse=False)
-	return render_template('page.html', events=events_list, devices=network_devices_list_sorted, num_devices=len(network_devices_list_sorted) + 1)
+	return render_template('page.html', events=network_events, devices=network_devices_list_sorted,
+						   num_devices=len(network_devices_list_sorted) + 1)
 
 
 def main():
