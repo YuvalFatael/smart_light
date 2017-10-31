@@ -10,6 +10,7 @@ import time
 import kcftracker
 import ip_configuration as IP
 from picamera.array import PiRGBArray
+import light
 ##############################################
 # Settings
 DEBUG = False
@@ -65,16 +66,14 @@ def cropRoi(image, roi):
     y = max(0,y-50)
     return image[y:to_y,x:to_x]
 
-def main(path_to_video):
+
+def md(path_to_video):
     ################################################################################################################
     ### 0) Initializtion
     ################################################################################################################
 
     # construct the argument parser and parse the arguments
-    #ap = argparse.ArgumentParser()
-    #ap.add_argument("-v", "--video", help="path to the video file")
-    #ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
-    #args = vars(ap.parse_args())
+
 
     alpha = IP.ALPHA_BLENDING
     trackers = []
@@ -83,7 +82,7 @@ def main(path_to_video):
     flagRight = flagLeft = False
 
     # if the video argument is None, then we are reading from webcam
-    if args.get("video", None) is None:
+    if path_to_video is None:
         camera = cv2.VideoCapture(0)
     #    camera = PiCamera()
     #    camera.resolution = (640, 480)
@@ -93,7 +92,6 @@ def main(path_to_video):
 
     # otherwise, we are reading from a video file
     else:
-        #camera = cv2.VideoCapture(args["video"])
         camera = cv2.VideoCapture(path_to_video)
 
     # loop over the frames of the video
@@ -141,6 +139,7 @@ def main(path_to_video):
 
             # if t.isTrackingBad() is True:
             #     trackers.remove(t)
+
 
 
             ############################################################################################################
@@ -220,8 +219,9 @@ def main(path_to_video):
                     imCrop = cropRoi(frame2show, left_roi)
                 else:
                     imCrop = frame2show
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-                cv2.imwrite(timestr + '-left.jpg', imCrop)
+                image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-left.jpg'
+                cv2.imwrite(image_fliename, imCrop)
+                light.motion_detected('Left', image_fliename)
         if flagRight:
             cv2.putText(frame2show, "Motion Right", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             # TODO: send message to right neighbour
@@ -231,10 +231,11 @@ def main(path_to_video):
                     imCrop = cropRoi(frame2show, right_roi)
                 else:
                     imCrop = frame2show
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-                cv2.imwrite(timestr + '-right.jpg', imCrop)
+                image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-right.jpg'
+                cv2.imwrite(image_fliename, imCrop)
+                light.motion_detected('Right', image_fliename)
 
-        print("--- %s seconds ---" % (time.time() - start_time))
+        #print("--- %s seconds ---" % (time.time() - start_time))
 
 
 
@@ -262,4 +263,7 @@ def main(path_to_video):
 
 
 if __name__ == '__main__':
-	main()
+        ap = argparse.ArgumentParser()
+        ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
+        args = ap.parse_args()
+	md(args.video[0])

@@ -1,2 +1,3 @@
 AWSIoTPythonSDK
 pyimgur
+ConfigParser

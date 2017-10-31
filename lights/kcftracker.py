@@ -1,6 +1,8 @@
 import numpy as np 
 import cv2
 
+import ip_configuration as IP
+
 #import fhog
 
 # ffttools
@@ -90,8 +92,12 @@ def subwindow(img, window, borderType=cv2.BORDER_CONSTANT):
 class KCFTracker:
 	def __init__(self, hog=False, fixed_window=True, multiscale=False):
 		self.lambdar = 0.0001   # regularization
-		self.padding = 2.5   # extra area surrounding the target
-		self.output_sigma_factor = 0.125   # bandwidth of gaussian target
+		self.padding = IP.TRACKER_SEARCH_WINDOW #2.5   # extra area surrounding the target
+		self.output_sigma_factor = IP.TRACKER_SIGMA_FACTOR #0.125   # bandwidth of gaussian target
+
+		#idan 28.10
+		self.bad_tracking_ctr = 0
+		self.is_bad_tracking = False
 
 		if(hog):  # HOG feature
 			# VOT
@@ -101,8 +107,8 @@ class KCFTracker:
 			self.cell_size = 4   # HOG cell size
 			self._hogfeatures = True
 		else:  # raw gray-scale image # aka CSK tracker
-			self.interp_factor = 0.075
-			self.sigma = 0.2
+			self.interp_factor = IP.TRACKER_INTERP_FACTOR # 0.075
+			self.sigma = IP.TRACKER_SIGMA # 0.2
 			self.cell_size = 1
 			self._hogfeatures = False
 
@@ -301,7 +307,16 @@ class KCFTracker:
 				self._scale *= self.scale_step
 				self._roi[2] *= self.scale_step
 				self._roi[3] *= self.scale_step
-		
+
+		#idan 28.10
+		# if peak_value < 0.55:
+		# 	self.bad_tracking_ctr += 1
+		# else:
+		# 	self.bad_tracking_ctr = 0
+        #
+		# if self.bad_tracking_ctr > 3:
+		# 	self.is_bad_tracking = True
+
 		self._roi[0] = cx - self._roi[2]/2.0 + loc[0]*self.cell_size*self._scale
 		self._roi[1] = cy - self._roi[3]/2.0 + loc[1]*self.cell_size*self._scale
 		
@@ -323,3 +338,6 @@ class KCFTracker:
 
 	def getAge(self):
 		return self._age
+
+	# def isTrackingBad(self):
+	# 	return self.is_bad_tracking

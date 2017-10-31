@@ -3,6 +3,7 @@ import time
 import logging
 import datetime
 import pyimgur
+import motion_detector
 from configparser import ConfigParser
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
@@ -26,6 +27,7 @@ endpoint_url = None
 endpoint_port = None
 imgur_client = None
 imgur_client_id = None
+image_processing_thread = None
 
 
 def control_message_handler(client, userdata, message):
@@ -62,6 +64,14 @@ def control_message_handler(client, userdata, message):
 
 def event_message_handler(client, userdata, message):  # TODO: implement event message handler
 	pass
+
+
+def motion_detected(direction, image_filename):
+        if myMQTTClient is None:  #  For debugging
+                print('direction: {}, image_filename: {}'.format(direction, image_filename))
+        else:
+                # TODO: implement motion_detected
+                pass
 
 
 def update_neighbors():
@@ -174,7 +184,7 @@ def get_config():
 
 
 def main():
-	global cleanup_network_devices_thread, control_message_thread, logger
+	global cleanup_network_devices_thread, control_message_thread, logger, image_processing_thread
 
 	# Get Config Parameters
 	get_config()
@@ -206,6 +216,9 @@ def main():
 	# Create Control Message thread
 	control_message_thread = threading.Thread(target=send_control_thread_func)
 	control_message_thread.start()
+
+	# Create Image proccessing thread       
+	image_processing_thread = threading.Thread(target=motion_detector.md('/home/pi/Videos/in.avi'))
 
 	while True:
 		pass
