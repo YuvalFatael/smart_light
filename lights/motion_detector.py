@@ -10,6 +10,7 @@ import time
 import kcftracker
 import ip_configuration as IP
 from picamera.array import PiRGBArray
+from picamera import PiCamera
 import light
 ##############################################
 # Settings
@@ -18,7 +19,7 @@ IMSHOW = False#True
 SAVE_EVENTS = True#False#True
 SAVE_FULL_FRAME = True
 ##############################################
-from picamera import PiCamera
+
 
 def overlap(box1, box2):
 
@@ -266,4 +267,4 @@ if __name__ == '__main__':
         ap = argparse.ArgumentParser()
         ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
         args = ap.parse_args()
-	md(args.video[0])
+        md(args.video[0])

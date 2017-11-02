@@ -67,11 +67,11 @@ def event_message_handler(client, userdata, message):  # TODO: implement event m
 
 
 def motion_detected(direction, image_filename):
-        if myMQTTClient is None:  #  For debugging
-                print('direction: {}, image_filename: {}'.format(direction, image_filename))
-        else:
-                # TODO: implement motion_detected
-                pass
+	if myMQTTClient is None:  #  For debugging
+		print('direction: {}, image_filename: {}'.format(direction, image_filename))
+	else:
+		# TODO: implement motion_detected
+		pass
 
 
 def update_neighbors():
