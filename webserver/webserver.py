@@ -40,6 +40,7 @@ def control_message_handler(client, userdata, message):
 						   'location': message_device_location,
 						   'time': update_time,
 						   'time_str': update_time_str}
+	# New device connected to network
 	if message_device_id not in network_devices.keys():
 		event = {'id': message_device_id,
 				 'event': '{} connected to network'.format(message_device_id),
@@ -91,7 +92,7 @@ def mqtt_connect():
 
 	myMQTTClient.connect()  # Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_handler)
-	myMQTTClient.subscribe("events", 1, event_message_handler)
+	myMQTTClient.subscribe("motions", 1, event_message_handler)
 
 @app.route("/clear")
 def clear():
