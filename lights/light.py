@@ -3,7 +3,9 @@ import time
 import logging
 import datetime
 import pyimgur
-import motion_detector
+#import motion_detector
+import string
+import random
 from configparser import ConfigParser
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
@@ -17,26 +19,26 @@ device_id = None
 device_location = None
 control_timer = None
 cleanup_margin = None  # number of control_timer times
-cleanup_network_devices_thread = None
-control_message_thread = None
-network_neighbors = {'Left': None, 'Right': None}
-network_devices = {}  # {'id': device_id, 'location': device_location, 'time': device_update_time}
+# network_neighbors = {'Left': '', 'Right': ''}
+network_devices = {}  # 'id': {'id': device_id, 'location': device_location, 'time': device_update_time}
+network_motions = {}  # 'motion_id': {'id': motion_id, 'direction': 'motion_direction', 'deadline': motion_deadline_time}
 send_control_lock = threading.Lock()
 config_filename = 'config.ini'
-endpoint_url = None
-endpoint_port = None
 imgur_client = None
-imgur_client_id = None
-image_processing_thread = None
+config_parser = None
+
+
+def id_generator(size=6, chars=string.ascii_lowercase + string.digits):
+	return ''.join(random.choice(chars) for _ in range(size))
 
 
 def control_message_handler(client, userdata, message):
-	global control_timestamp, control_message_thread
+	global control_timestamp
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
 	message_device_id = control_msg[0]
 	message_device_location = control_msg[1]
 
-	# Got the control message I sent
+	# Got a control message I sent
 	if message_device_id == device_id:
 		return
 
@@ -50,30 +52,63 @@ def control_message_handler(client, userdata, message):
 	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
 	update_time = time.time()
-	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
 	message_device_info = {'id': message_device_id,
 						   'location': message_device_location,
-						   'time': update_time,
-						   'time_str': update_time_str}
+						   'time': update_time}
 	network_devices[message_device_id] = message_device_info
 	# Check if network devices should be updated
-	if old_message_device_info is None or old_message_device_info['location'] != message_device_location:
+	'''if old_message_device_info is None or old_message_device_info['location'] != message_device_location:
 		# Update Neighbors
-		update_neighbors()
+		update_neighbors()'''
 
 
-def event_message_handler(client, userdata, message):  # TODO: implement event message handler
-	pass
+def motion_message_handler(client, userdata, message):
+	motion_msg = message.payload.decode("utf-8").split(
+		',')  # Motion message structure: 'deviceID,motionID,motion_direction,motion_speed'
+	message_device_id = motion_msg[0]
+
+	# Got a motion message I sent
+	if message_device_id == device_id:
+		return
+
+	motion_id = motion_msg[1]
+	motion_direction = motion_msg[2]
+	motion_speed = motion_msg[3]
+	sender_location = int(network_devices[message_device_id]['location'])
+	my_location = get_location()
+	# If the motion is coming to us
+	if (motion_direction == 'Right' and my_location - sender_location > 0) or (
+					motion_direction == 'Left' and my_location - sender_location < 0):
+		motion_deadline = get_motion_deadline(message_device_id, motion_speed)
+		motion_info = {'id': motion_id,
+					   'direction': motion_direction,
+					   'deadline': motion_deadline}
+		network_motions[motion_id] = motion_info
+		logger.debug('%s added motion %s direction: %s deadline: %s', device_id, motion_id, motion_direction,
+					 datetime.datetime.fromtimestamp(motion_deadline).strftime('%d/%m/%Y %H:%M:%S'))
 
 
-def motion_detected(direction, image_filename):
-	if myMQTTClient is None:  #  For debugging
+def motion_detected(direction, speed, image_filename):
+	if myMQTTClient is None:  # For debugging
 		print('direction: {}, image_filename: {}'.format(direction, image_filename))
 	else:
-		# TODO: implement motion_detected
-		pass
+		# We are expecting a motion
+		if len(network_motions) > 0:
+			motion = None
+			for motion_event in network_motions.values():
+				if motion is None or motion['time'] > motion_event['time']:
+					motion = motion_event
+			motion_id = motion['id']
+		# New motion
+		else:
+			motion_id = id_generator()
+
+		# Send motion event
+		# neighbor_id = network_neighbors[direction]
+		send_motion(motion_id, direction, speed)
 
 
+'''
 def update_neighbors():
 	right_neighbor = None
 	left_neighbor = None
@@ -101,25 +136,26 @@ def update_neighbors():
 
 	network_neighbors['Left'] = left_neighbor
 	logger.debug('%s set left_neighbor %s', device_id, left_neighbor)
+'''
 
 
-def cleanup_neighbors():
-	flag = 0
+def cleanup_network_devices():
+	# flag = 0
 	for iter_device_id in list(network_devices):
 		network_device_update_time = network_devices[iter_device_id]['time']
 		if time.time() - network_device_update_time > control_timer * cleanup_margin:
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
-			flag = 1
+		#		flag = 1
 
-	if flag == 1:
-		update_neighbors()
+		# if flag == 1:
+		#	update_neighbors()
 
 
 def cleanup_network_thread_func():
 	while True:
 		time.sleep(control_timer / 2)
-		cleanup_neighbors()
+		cleanup_network_devices()
 
 
 def send_control_thread_func():
@@ -131,6 +167,16 @@ def send_control_thread_func():
 			threading.Thread(target=send_control).start()
 
 
+def check_motion_thread_func():
+	while True:
+		time.sleep(1)
+		for iter_motion_id in list(network_motions):
+			motion = network_motions[iter_motion_id]
+			if motion['deadline'] < time.time():
+				print('MOTION NOT DETECTED {}'.format(motion['id']))
+				del network_motions[motion['id']]
+
+
 def send_control():
 	global control_timestamp
 	send_control_lock.acquire()
@@ -140,7 +186,15 @@ def send_control():
 	except publishTimeoutException:
 		logger.error('%s got TIMEOUT', device_id)
 	send_control_lock.release()
-	logger.debug('%s sent control with locaiton: %s', device_id, device_location)
+	logger.debug('%s sent control with location: %s', device_id, device_location)
+
+
+def send_motion(motion_id, motion_direction, motion_speed):
+	try:
+		myMQTTClient.publish("motion", "{},{},{},{}".format(device_id, motion_id, motion_direction, motion_speed), 1)
+	except publishTimeoutException:
+		logger.error('%s got TIMEOUT', device_id)
+	logger.debug('%s sent motion id: %s direction: %s speed: %s', device_id, motion_id, motion_direction, motion_speed)
 
 
 def get_location():  # TODO: implement location function
@@ -152,44 +206,49 @@ def mqtt_connect():
 	# For certificate based connection
 	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
 	# For TLS mutual authentication
+	endpoint_url = config_parser.get('mqtt', 'endpoint_url')
+	endpoint_port = int(config_parser.get('mqtt', 'endpoint_port'))
 	myMQTTClient.configureEndpoint(endpoint_url, endpoint_port)
-	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id), "certs/{}.cert.pem".format(device_id))
+	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id),
+									  "certs/{}.cert.pem".format(device_id))
 
 	myMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
 	myMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
 	myMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
 	myMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
 
-	myMQTTClient.connect() 	# Todo: try catch?
+	myMQTTClient.connect()  # Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_handler)
-	myMQTTClient.subscribe("events", 1, event_message_handler)
+	myMQTTClient.subscribe("motion", 1, motion_message_handler)
 
 
 def imgur_connect():
 	global imgur_client
+	imgur_client_id = config_parser.get('imgur', 'imgur_client_id')
 	imgur_client = pyimgur.Imgur(imgur_client_id)
 
 
+def get_motion_deadline(sender_device_id, motion_speed):
+	return time.time() + abs(10 * (int(network_devices[sender_device_id]['location']) - int(get_location())))
+
+
+def generate_motion_for_debug():
+	time.sleep(5)
+	send_motion(id_generator(), 'Right', 10)
+
+
 def get_config():
-	global device_id, device_location, control_timer, cleanup_margin, endpoint_url, endpoint_port, imgur_client_id, imgur_client_secret
-	parser = ConfigParser()
-	parser.read(config_filename)
-	device_id = parser.get('light', 'device_id')
-	device_location = int(parser.get('light', 'device_location'))
-	control_timer = int(parser.get('light', 'control_timer'))
-	cleanup_margin = int(parser.get('light', 'cleanup_margin'))
-	endpoint_url = parser.get('mqtt', 'endpoint_url')
-	endpoint_port = int(parser.get('mqtt', 'endpoint_port'))
-	imgur_client_id = parser.get('imgur', 'imgur_client_id')
+	global config_parser, device_id, device_location, control_timer, cleanup_margin
+	config_parser = ConfigParser()
+	config_parser.read(config_filename)
+	device_id = config_parser.get('light', 'device_id')
+	device_location = config_parser.getint('light', 'device_location')
+	control_timer = config_parser.getint('light', 'control_timer')
+	cleanup_margin = config_parser.getint('light', 'cleanup_margin')
 
 
-def main():
-	global cleanup_network_devices_thread, control_message_thread, logger, image_processing_thread
-
-	# Get Config Parameters
-	get_config()
-
-	# Logging congif
+def get_logger():
+	global logger
 	logger = logging.getLogger('smart_light')
 	handler = logging.StreamHandler()
 	formatter = logging.Formatter(
@@ -197,6 +256,14 @@ def main():
 	handler.setFormatter(formatter)
 	logger.addHandler(handler)
 	logger.setLevel(logging.DEBUG)
+
+
+def main():
+	# Get Config and General Parameters
+	get_config()
+
+	# Get Logger
+	get_logger()
 
 	# Connect to Amazon's MQTT service
 	mqtt_connect()
@@ -217,11 +284,19 @@ def main():
 	control_message_thread = threading.Thread(target=send_control_thread_func)
 	control_message_thread.start()
 
-	# Create Image proccessing thread       
-	image_processing_thread = threading.Thread(target=motion_detector.md('/home/pi/Videos/in.avi'))
+	# Create Check Motion thread
+	motion_check_thread = threading.Thread(target=check_motion_thread_func)
+	motion_check_thread.start()
+
+	# Create Image processing thread for Debug
+	if config_parser.getboolean('motion', 'run_video') is True:
+		threading.Thread(target=generate_motion_for_debug).start()
+		#image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
+		#image_processing_thread.start()
 
 	while True:
 		pass
+
 
 if __name__ == '__main__':
 	main()
