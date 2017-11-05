@@ -88,6 +88,21 @@ def motion_message_handler(client, userdata, message):
 					 datetime.datetime.fromtimestamp(motion_deadline).strftime('%d/%m/%Y %H:%M:%S'))
 
 
+def alert_message_handler(client, userdata, message):
+	alert_msg = message.payload.decode("utf-8").split(
+		',')  # Alert message structure: 'deviceID,motionID'
+	message_device_id = alert_msg[0]
+
+	# Got a motion message I sent
+	if message_device_id == device_id:
+		return
+
+	alert_motion_id = alert_msg[1]
+	if alert_motion_id in network_motions:
+		del network_motions[alert_motion_id]
+		logger.debug('%s removed motion %s which failed to reach %s', device_id, alert_motion_id, message_device_id)
+
+
 def motion_detected(direction, speed, image_filename):
 	if myMQTTClient is None:  # For debugging
 		print('direction: {}, image_filename: {}'.format(direction, image_filename))
@@ -173,7 +188,7 @@ def check_motion_thread_func():
 		for iter_motion_id in list(network_motions):
 			motion = network_motions[iter_motion_id]
 			if motion['deadline'] < time.time():
-				print('MOTION NOT DETECTED {}'.format(motion['id']))
+				send_alert(motion['id'])
 				del network_motions[motion['id']]
 
 
@@ -195,6 +210,14 @@ def send_motion(motion_id, motion_direction, motion_speed):
 	except publishTimeoutException:
 		logger.error('%s got TIMEOUT', device_id)
 	logger.debug('%s sent motion id: %s direction: %s speed: %s', device_id, motion_id, motion_direction, motion_speed)
+
+
+def send_alert(motion_id):
+	try:
+		myMQTTClient.publish("alert", "{},{}".format(device_id, motion_id), 1)
+	except publishTimeoutException:
+		logger.error('%s got TIMEOUT', device_id)
+	logger.debug('%s sent alert on motion_id: %s', device_id, motion_id)
 
 
 def get_location():  # TODO: implement location function
@@ -220,6 +243,7 @@ def mqtt_connect():
 	myMQTTClient.connect()  # Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_handler)
 	myMQTTClient.subscribe("motion", 1, motion_message_handler)
+	myMQTTClient.subscribe("alert", 1, alert_message_handler)
 
 
 def imgur_connect():
