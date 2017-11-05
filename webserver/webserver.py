@@ -51,8 +51,40 @@ def control_message_handler(client, userdata, message):
 	logger.debug('%s updated network_devices: %s', device_id, str(message_device_info))
 
 
-def event_message_handler(client, userdata, message):  # TODO: implement event message handler
-	pass
+def motion_message_handler(client, userdata, message):  # TODO: implement event message handler
+	motion_msg = message.payload.decode("utf-8").split(
+		',')  # Motion message structure: 'deviceID,motionID,motion_direction,motion_speed'
+	message_device_id = motion_msg[0]
+	motion_id = motion_msg[1]
+	motion_direction = motion_msg[2]
+	motion_speed = motion_msg[3]
+
+	# Create Motion event
+	update_time = time.time()
+	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
+	event = {'id': message_device_id,
+			 'event': '{} detected motion id: {}, direction: {}, speed: {}'.format(message_device_id, motion_id,
+																				   motion_direction, motion_speed),
+			 'time': update_time,
+			 'time_str': update_time_str}
+	network_events.append(event)
+	logger.debug('%s added motion: %s, %s, %s', device_id, motion_id, motion_direction, motion_speed)
+
+
+def alert_message_handler(client, userdata, message):  # TODO: implement event message handler
+	alert_msg = message.payload.decode("utf-8").split(',')  # Alert message structure: 'deviceID,motionID'
+	message_device_id = alert_msg[0]
+	motion_id = alert_msg[1]
+
+	# Create Alert event
+	update_time = time.time()
+	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
+	event = {'id': message_device_id,
+			 'event': '{} motion id: {} is missing!!!'.format(message_device_id, motion_id),
+			 'time': update_time,
+			 'time_str': update_time_str}
+	network_events.append(event)
+	logger.debug('%s alert on motion: %s', device_id, motion_id)
 
 
 def cleanup_neighbors():
@@ -92,7 +124,9 @@ def mqtt_connect():
 
 	myMQTTClient.connect()  # Todo: try catch?
 	myMQTTClient.subscribe("control", 1, control_message_handler)
-	myMQTTClient.subscribe("motions", 1, event_message_handler)
+	myMQTTClient.subscribe("motion", 1, motion_message_handler)
+	myMQTTClient.subscribe("alert", 1, alert_message_handler)
+
 
 @app.route("/clear")
 def clear():
