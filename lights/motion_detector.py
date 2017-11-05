@@ -10,16 +10,19 @@ import time
 import kcftracker
 import ip_configuration as IP
 from picamera.array import PiRGBArray
-from picamera import PiCamera
 import light
+import multiprocessing as mp
+import threading
+
 ##############################################
 # Settings
-DEBUG = False
-IMSHOW = False#True
-SAVE_EVENTS = True#False#True
+DEBUG = True
+IMSHOW = True
+SAVE_EVENTS = True
 SAVE_FULL_FRAME = True
+NUM_CORE = 2
 ##############################################
-
+from picamera import PiCamera
 
 def overlap(box1, box2):
 
@@ -52,8 +55,8 @@ def isEdge(boundingbox, frameSize):
         return 'Left'
     if (x+w) >= (cols-IP.MARGINS_IGNORANCE_TO_DECISION+1):
         return 'Right'
-    if (y <= 1) | ((y+h) >= (rows-1)):
-        return 'Vertical'
+    # if (y <= 1) | ((y+h) >= (rows-1)):
+    #    return 'Vertical'
 
     return None
 
@@ -66,6 +69,12 @@ def cropRoi(image, roi):
     x = max(0,x-50)
     y = max(0,y-50)
     return image[y:to_y,x:to_x]
+
+
+def worker(arg):
+    obj, frame = arg
+    return obj.update(frame)
+
 
 
 def md(path_to_video):
@@ -105,6 +114,11 @@ def md(path_to_video):
         ################################################################################################################
 
         # grab the current frame
+
+        camera.read()
+        camera.read()
+        camera.read()
+        camera.read()
         (grabbed, frame) = camera.read()
         # if the frame could not be grabbed, then we have reached the end of the video
         if not grabbed:
@@ -115,18 +129,19 @@ def md(path_to_video):
         ################################################################################################################
         ### 2) Pre-Processing
         ################################################################################################################
-
+        pre_start_time = time.time()
         # resize the frame, convert it to grayscale, and blur it
         if frame.shape[0] > 240 or frame.shape[1] > 360:
             frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation  = cv2.INTER_LINEAR)
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray_frame, (21, 21), 0)
+        gray = cv2.GaussianBlur(gray_frame, IP.GAUSSIAN_WIDTH, 0)
         frame2show = frame.copy()
         # if the first frame is None, initialize it
         if model is None:
             model = gray
             continue
-
+        pre_end_time = time.time()
+        pre_time = pre_end_time - pre_start_time
         ################################################################################################################
         ### 3) Track existing trackers, and update them
         ################################################################################################################
@@ -134,13 +149,38 @@ def md(path_to_video):
         flagRight = False
         right_roi = None
         left_roi = None
+
+        trk_start_time = time.time()
+        #pool = mp.Pool(NUM_CORE)
+        #trackers_bboxes = pool.map(worker, ((obj,gray_frame) for obj in trackers))
+        #pool.close()
+        #pool.join()
+        
+        #Trackers_bboxes = map(lambda x: x.update(gray_frame), trackers)
+
+        threads = []
         for t in trackers:
-            boundingbox = t.update(gray_frame)
-            boundingbox = map(int, boundingbox)
+            thread = threading.Thread(target=t.update, args=([gray_frame]))
+            threads.append(thread)
+            thread.start() # start the thread we just created   
+
+        for t in threads:
+            t.join()                                                                
+
+
+
+            
+        trk_end_time = time.time()
+        trk_time = trk_end_time - trk_start_time
+        
+        #for t in trackers:
+        #    boundingbox = t.update(gray_frame)
+            #boundingbox = map(int, boundingbox)
 
             # if t.isTrackingBad() is True:
             #     trackers.remove(t)
 
+       
 
 
             ############################################################################################################
@@ -149,7 +189,8 @@ def md(path_to_video):
 
             # if a tracker got into the frame edges, remove it.
             # in addition, raise a movement flag about the relevant direction (left or right)
-
+        for t in trackers:
+            boundingbox = t.getPos()
             edge = isEdge(boundingbox, [gray_frame.shape[0], gray_frame.shape[1]])
             if edge is not None:
                 if edge is 'Right':
@@ -158,11 +199,19 @@ def md(path_to_video):
                 if edge is 'Left':
                     flagLeft = True
                     left_roi = boundingbox
+                speed = t.getVelocity() #in pixels per frame!!
+                
+                delta_alpha = speed / IP.IMAGE_WIDTH * IP.CAMERA_FOV
+                speedMetersPerFrame = 2 * IP.DISTANCE_FROM_DETECTIONS * np.tan(np.radians(2*delta_alpha))
+                                                                                          
+               # print "speed is : {}".format(speed)
+                                                                                          
                 trackers.remove(t)
+                
 
-
-            cv2.rectangle(frame2show, (boundingbox[0], boundingbox[1]),
-                     (boundingbox[0] + boundingbox[2], boundingbox[1] + boundingbox[3]), (0, 255, 255), 2)
+            if IMSHOW:
+                cv2.rectangle(frame2show, (boundingbox[0], boundingbox[1]),
+                         (boundingbox[0] + boundingbox[2], boundingbox[1] + boundingbox[3]), (0, 255, 255), 2)
 
             # TODO: if object is not moving much, remove it.
 
@@ -171,6 +220,7 @@ def md(path_to_video):
         ################################################################################################################
         ### 5) Motion Detection assignment
         ################################################################################################################
+        md_start_time = time.time()
 
         # compute the absolute difference between the current frame and first frame
         frameDelta = cv2.absdiff(model, gray)
@@ -192,7 +242,8 @@ def md(path_to_video):
             aspect_ratio = float(h)/w
             if aspect_ratio < IP.PERSON_ASPECT_RATIO:
                 continue
-            cv2.rectangle(frame2show, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            if IMSHOW:
+                cv2.rectangle(frame2show, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             #if a new object detect, start tracking on it
             if isNewObject([x,y,w,h], trackers):
@@ -206,13 +257,16 @@ def md(path_to_video):
 
 
 
-        model = cv2.addWeighted(model, 1 - alpha, gray, alpha, 0)
-
+        #model = cv2.addWeighted(model, 1 - alpha, gray, alpha, 0)
+        md_end_time = time.time()
+        md_time = md_end_time - md_start_time
         ################################################################################################################
         ### 6) Display
         ################################################################################################################
+
         if flagLeft:
-            cv2.putText(frame2show, "Motion Left", (10, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if IMSHOW:
+                cv2.putText(frame2show, "Motion Left, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             # TODO: send message to left neighbours
             if SAVE_EVENTS:
                 if not SAVE_FULL_FRAME:
@@ -224,7 +278,8 @@ def md(path_to_video):
                 cv2.imwrite(image_fliename, imCrop)
                 light.motion_detected('Left', image_fliename)
         if flagRight:
-            cv2.putText(frame2show, "Motion Right", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if IMSHOW:
+                cv2.putText(frame2show, "Motion Right, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             # TODO: send message to right neighbour
             if SAVE_EVENTS:
                 if not SAVE_FULL_FRAME:
@@ -236,7 +291,7 @@ def md(path_to_video):
                 cv2.imwrite(image_fliename, imCrop)
                 light.motion_detected('Right', image_fliename)
 
-        #print("--- %s seconds ---" % (time.time() - start_time))
+        print("--- {:.4f} seconds: pre({:.3f}), md({:.3f}), trk({:.3f})".format(time.time() - start_time, pre_time, md_time, trk_time))
 
 
 
@@ -267,4 +322,4 @@ if __name__ == '__main__':
         ap = argparse.ArgumentParser()
         ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
         args = ap.parse_args()
-        md(args.video[0])
+	md(args.video[0])

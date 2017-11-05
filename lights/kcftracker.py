@@ -5,6 +5,8 @@ import ip_configuration as IP
 
 #import fhog
 
+
+
 # ffttools
 def fftd(img, backwards=False):	
 	# shape of img can be (m,n), (m,n,1) or (m,n,2)	
@@ -193,7 +195,7 @@ class KCFTracker:
 
 		if(inithann):
 			padded_w = self._roi[2] * self.padding
-			padded_h = self._roi[3] * self.padding
+			padded_h = self._roi[3] * 1#self.padding
 
 			if(self.template_size > 1):
 				if(padded_w >= padded_h):
@@ -276,6 +278,7 @@ class KCFTracker:
 		self._prob = self.createGaussianPeak(self.size_patch[0], self.size_patch[1])
 		self._alphaf = np.zeros((self.size_patch[0], self.size_patch[1], 2), np.float32)
 		self._age = 0
+		self._dist = 0
 		self.train(self._tmpl, 1.0)
 
 	def update(self, image):
@@ -330,14 +333,21 @@ class KCFTracker:
 		self.train(x, self.interp_factor)
 
 		self._age += 1
+		self._dist += loc[0] #only in x axis
 
+                self._roi = map(int, self._roi)
+                
 		return self._roi
+                #return isEdge(self._roi, [image.shape[0], image.shape[1]])isEdge
 
 	def getPos(self):
 		return self._roi
 
 	def getAge(self):
 		return self._age
+
+	def getVelocity(self): 
+                return self._dist / self._age
 
 	# def isTrackingBad(self):
 	# 	return self.is_bad_tracking
