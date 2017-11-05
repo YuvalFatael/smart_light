@@ -51,7 +51,7 @@ def control_message_handler(client, userdata, message):
 	logger.debug('%s updated network_devices: %s', device_id, str(message_device_info))
 
 
-def motion_message_handler(client, userdata, message):  # TODO: implement event message handler
+def motion_message_handler(client, userdata, message):
 	motion_msg = message.payload.decode("utf-8").split(
 		',')  # Motion message structure: 'deviceID,motionID,motion_direction,motion_speed'
 	message_device_id = motion_msg[0]
@@ -71,7 +71,7 @@ def motion_message_handler(client, userdata, message):  # TODO: implement event 
 	logger.debug('%s added motion: %s, %s, %s', device_id, motion_id, motion_direction, motion_speed)
 
 
-def alert_message_handler(client, userdata, message):  # TODO: implement event message handler
+def alert_message_handler(client, userdata, message):
 	alert_msg = message.payload.decode("utf-8").split(',')  # Alert message structure: 'deviceID,motionID'
 	message_device_id = alert_msg[0]
 	motion_id = alert_msg[1]
@@ -111,7 +111,7 @@ def cleanup_network_thread_func():
 def mqtt_connect():
 	global myMQTTClient
 	# For certificate based connection
-	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
+	myMQTTClient = AWSIoTMQTTClient(device_id)
 	# For TLS mutual authentication
 	myMQTTClient.configureEndpoint("audsodu4ke8z4.iot.us-west-2.amazonaws.com", 8883)
 	myMQTTClient.configureCredentials("certs/root-CA.crt", "certs/{}.private.key".format(device_id),

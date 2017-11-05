@@ -227,7 +227,7 @@ def get_location():  # TODO: implement location function
 def mqtt_connect():
 	global myMQTTClient
 	# For certificate based connection
-	myMQTTClient = AWSIoTMQTTClient(device_id)  # Todo: all these should be environment vars ?
+	myMQTTClient = AWSIoTMQTTClient(device_id)
 	# For TLS mutual authentication
 	endpoint_url = config_parser.get('mqtt', 'endpoint_url')
 	endpoint_port = int(config_parser.get('mqtt', 'endpoint_port'))
