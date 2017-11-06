@@ -110,6 +110,7 @@ class KCFTracker:
 		self.output_sigma_factor = config_parser.getfloat('tracker', 'sigma_factor') #0.125   # bandwidth of gaussian target
                 self.min_movement = config_parser.getint('tracker', 'min_movement')
                 self.nonmoving_lifetime = config_parser.getint('tracker', 'nonmoving_lifetime')
+                self.entrance_frame = None
                 
 		#idan 28.10
 		self.not_moving_ctr = 0
@@ -295,6 +296,8 @@ class KCFTracker:
 		self._dist = 0
 		self.train(self._tmpl, 1.0)
 
+		self.entrance_frame = image
+
 	def update(self, image):
 		if(self._roi[0]+self._roi[2] <= 0):  self._roi[0] = -self._roi[2] + 1
 		if(self._roi[1]+self._roi[3] <= 0):  self._roi[1] = -self._roi[2] + 1
@@ -366,3 +369,6 @@ class KCFTracker:
 
 	def isNotMoving(self):
 	 	return self.is_not_moving
+
+	def getEntranceFrame(self):
+                return self.entrance_frame

@@ -304,7 +304,6 @@ def md(path_to_video):
             
             if IMSHOW:
                 cv2.putText(frame2show, "Motion Right, speed: {:.3f} m/sec".format(speedMeterPerSecond), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-                cv2.putText(frame2show, "ID: {} ".format(device_id), (5, 15),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
             if flagLeft:
                 image_filename = time.strftime("%Y%m%d-%H%M%S") + '-left.jpg'
@@ -332,6 +331,7 @@ def md(path_to_video):
         
         # show the frame and record if the user presses a key
         if IMSHOW:
+            cv2.putText(frame2show, "ID: {} ".format(device_id), (5, 15),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             cv2.imshow("Image", frame2show)
         if config_parser.getboolean('debug', 'debug') :
             cv2.imshow("Thresh", thresh1)
