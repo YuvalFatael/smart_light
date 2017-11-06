@@ -8,21 +8,28 @@ import cv2
 import numpy as np
 import time
 import kcftracker
-import ip_configuration as IP
+#import ip_configuration as IP
 from picamera.array import PiRGBArray
 import light
 import multiprocessing as mp
 import threading
-
-##############################################
-# Settings
-DEBUG = True
-IMSHOW = True
-SAVE_EVENTS = True
-SAVE_FULL_FRAME = True
-NUM_CORE = 2
-##############################################
 from picamera import PiCamera
+from configparser import ConfigParser
+
+
+#Globals
+config_filename = 'config.ini'
+config_parser = None
+do_resize = None
+
+
+
+def get_config():
+	global config_parser, do_resize, device_id
+	config_parser = ConfigParser()
+	config_parser.read(config_filename)
+        do_resize = config_parser.getboolean('tracker', 'resized')
+        device_id = config_parser.get('light', 'device_id')
 
 def overlap(box1, box2):
 
@@ -41,6 +48,8 @@ def isNewObject(boundingbox, trackers):
     # for each tracker, check if it overlaps with the bounding box received as input
     for t in trackers:
         bbox = t.getPos()
+        if do_resize:
+            bbox = [bbox[0]*2, bbox[1]*2, bbox[2]*2, bbox[3]*2]
         if overlap(map(int,bbox), map(int,boundingbox)):
             return False
     # if no tracker overlap with it, return True.
@@ -50,15 +59,16 @@ def isNewObject(boundingbox, trackers):
 def isEdge(boundingbox, frameSize):
     x = boundingbox[0]; y = boundingbox[1]; w = boundingbox[2]; h = boundingbox[3]
     rows = frameSize[0]; cols = frameSize[1];
-
-    if x <= IP.MARGINS_IGNORANCE_TO_DECISION+1:
+    margins_decision = config_parser.getint('detection', 'margins_ignorance_decision')
+    if x <= margins_decision+1:
         return 'Left'
-    if (x+w) >= (cols-IP.MARGINS_IGNORANCE_TO_DECISION+1):
+    if (x+w) >= (cols-margins_decision+1):
         return 'Right'
     # if (y <= 1) | ((y+h) >= (rows-1)):
     #    return 'Vertical'
 
     return None
+
 
 
 def cropRoi(image, roi):
@@ -78,19 +88,26 @@ def worker(arg):
 
 
 def md(path_to_video):
+
+    get_config()
+    IMSHOW = config_parser.getboolean('debug', 'imshow')
+    
     ################################################################################################################
     ### 0) Initializtion
     ################################################################################################################
 
-    # construct the argument parser and parse the arguments
-
-
-    alpha = IP.ALPHA_BLENDING
+    alpha = config_parser.get('detection', 'alpha_blending')
     trackers = []
     model = None
-    kernel = np.ones(IP.CLOSING_KERNEL, np.uint8)
+    hh = config_parser.getint('detection', 'closing_kernel_height')
+    ww = config_parser.getint('detection', 'closing_kernel_width')
+    kernel = np.ones((ww,hh), np.uint8)
     flagRight = flagLeft = False
+    max_time = -1
+    
 
+    cv2.namedWindow('Image', cv2.WINDOW_NORMAL)
+    time.sleep(0.25)
     # if the video argument is None, then we are reading from webcam
     if path_to_video is None:
         camera = cv2.VideoCapture(0)
@@ -115,10 +132,9 @@ def md(path_to_video):
 
         # grab the current frame
 
-        camera.read()
-        camera.read()
-        camera.read()
-        camera.read()
+        for repeat in range (1,3):
+            camera.read()
+
         (grabbed, frame) = camera.read()
         # if the frame could not be grabbed, then we have reached the end of the video
         if not grabbed:
@@ -131,10 +147,14 @@ def md(path_to_video):
         ################################################################################################################
         pre_start_time = time.time()
         # resize the frame, convert it to grayscale, and blur it
-        if frame.shape[0] > 240 or frame.shape[1] > 360:
-            frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation  = cv2.INTER_LINEAR)
+        
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray_frame, IP.GAUSSIAN_WIDTH, 0)
+
+        if do_resize:
+            frame_resized = cv2.resize(gray_frame, None, fx=0.5, fy=0.5, interpolation  = cv2.INTER_LINEAR)
+        
+        gw = config_parser.getint('detection', 'gaussian_width')
+        gray = cv2.GaussianBlur(gray_frame, (gw,gw) , 0)
         frame2show = frame.copy()
         # if the first frame is None, initialize it
         if model is None:
@@ -151,24 +171,23 @@ def md(path_to_video):
         left_roi = None
 
         trk_start_time = time.time()
-        #pool = mp.Pool(NUM_CORE)
-        #trackers_bboxes = pool.map(worker, ((obj,gray_frame) for obj in trackers))
-        #pool.close()
-        #pool.join()
         
         #Trackers_bboxes = map(lambda x: x.update(gray_frame), trackers)
-
         threads = []
+        if do_resize:
+            tracker_frame = frame_resized
+        else:
+            tracker_frame = gray_frame
+            
         for t in trackers:
-            thread = threading.Thread(target=t.update, args=([gray_frame]))
+            thread = threading.Thread(target=t.update, args=([tracker_frame]))
             threads.append(thread)
-            thread.start() # start the thread we just created   
+            thread.start()
 
         for t in threads:
-            t.join()                                                                
+            t.join()
 
-
-
+        
             
         trk_end_time = time.time()
         trk_time = trk_end_time - trk_start_time
@@ -191,6 +210,8 @@ def md(path_to_video):
             # in addition, raise a movement flag about the relevant direction (left or right)
         for t in trackers:
             boundingbox = t.getPos()
+            if do_resize:
+                boundingbox = [boundingbox[0]*2, boundingbox[1]*2, boundingbox[2]*2, boundingbox[3]*2]
             edge = isEdge(boundingbox, [gray_frame.shape[0], gray_frame.shape[1]])
             if edge is not None:
                 if edge is 'Right':
@@ -201,8 +222,8 @@ def md(path_to_video):
                     left_roi = boundingbox
                 speed = t.getVelocity() #in pixels per frame!!
                 
-                delta_alpha = speed / IP.IMAGE_WIDTH * IP.CAMERA_FOV
-                speedMetersPerFrame = 2 * IP.DISTANCE_FROM_DETECTIONS * np.tan(np.radians(2*delta_alpha))
+                delta_alpha = speed / config_parser.getint('motion', 'image_width') * config_parser.getfloat('motion', 'camera_fov')
+                speedMetersPerFrame = 2 * config_parser.getfloat('motion', 'camera_distance') * np.tan(np.radians(2*delta_alpha))
                                                                                           
                # print "speed is : {}".format(speed)
                                                                                           
@@ -224,23 +245,26 @@ def md(path_to_video):
 
         # compute the absolute difference between the current frame and first frame
         frameDelta = cv2.absdiff(model, gray)
-        thresh1 = cv2.threshold(frameDelta,IP.ABSDIFF_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+        th = config_parser.getint('detection', 'absdiff_threshold')
+        thresh1 = cv2.threshold(frameDelta, th, 255, cv2.THRESH_BINARY)[1]
         thresh2 = cv2.morphologyEx(thresh1, cv2.MORPH_CLOSE, kernel, 2)
         (_, cnts, _) = cv2.findContours(thresh2.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # loop over the contours
         for c in cnts:
+            
             # if the contour is too small, ignore it
-            if cv2.contourArea(c) < IP.MIN_BLOB_AREA:
+            if cv2.contourArea(c) < config_parser.getint('detection', 'min_blob_area'):             
                 continue
 
             # compute the bounding box for the contour, draw it on the frame,
             # and update the text
             (x, y, w, h) = cv2.boundingRect(c)
-            if x < IP.MARGINS_IGNORANCE_TO_DETECT or (x+w) > (frame.shape[1]-IP.MARGINS_IGNORANCE_TO_DETECT):
+            margins_detection = config_parser.getint('detection', 'margins_ignorance_detection')
+            if x < margins_detection or (x+w) > (frame.shape[1]-margins_detection):
                 continue
             aspect_ratio = float(h)/w
-            if aspect_ratio < IP.PERSON_ASPECT_RATIO:
+            if aspect_ratio < config_parser.getfloat('detection', 'person_aspect_ratio') :
                 continue
             if IMSHOW:
                 cv2.rectangle(frame2show, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -248,9 +272,13 @@ def md(path_to_video):
             #if a new object detect, start tracking on it
             if isNewObject([x,y,w,h], trackers):
                 new_tracker = kcftracker.KCFTracker(False, False, False)
-                new_tracker.init([x, y, w, h], frame)
+                if do_resize:
+                    new_tracker.init(map(int,[x/2, y/2, w/2, h/2]), frame_resized)
+                else:
+                    new_tracker.init([x, y, w, h], frame)
                 trackers.append(new_tracker)
                 trackerInit = True
+                
 
 
         # TODO: if certain tracker doesn't overlap with any other detection, at least 10 frames, erase it.
@@ -263,10 +291,11 @@ def md(path_to_video):
         ################################################################################################################
         ### 6) Display
         ################################################################################################################
-
+        SAVE_EVENTS = config_parser.get('motion', 'save_events')
+        SAVE_FULL_FRAME = True
         if flagLeft:
             if IMSHOW:
-                cv2.putText(frame2show, "Motion Left, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 20),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                cv2.putText(frame2show, "Motion Left, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 30),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
             # TODO: send message to left neighbours
             if SAVE_EVENTS:
                 if not SAVE_FULL_FRAME:
@@ -276,7 +305,7 @@ def md(path_to_video):
                     imCrop = frame2show
                 image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-left.jpg'
                 cv2.imwrite(image_fliename, imCrop)
-                light.motion_detected('Left', image_fliename)
+                light.motion_detected('Left', image_fliename, 0)
         if flagRight:
             if IMSHOW:
                 cv2.putText(frame2show, "Motion Right, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
@@ -289,22 +318,32 @@ def md(path_to_video):
                     imCrop = frame2show
                 image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-right.jpg'
                 cv2.imwrite(image_fliename, imCrop)
-                light.motion_detected('Right', image_fliename)
+                light.motion_detected('Right', image_fliename, 0)
 
-        print("--- {:.4f} seconds: pre({:.3f}), md({:.3f}), trk({:.3f})".format(time.time() - start_time, pre_time, md_time, trk_time))
+        cv2.putText(frame2show, "ID: {} ".format(device_id), (5, 15),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
 
 
+
+        
+        algo_end_time = time.time()
+        algo_time = algo_end_time - start_time
+
+        time_to_wait = 166 - int(algo_time*1000)
+        if time_to_wait <= 0:
+            time_to_wait = 1
+        print time_to_wait
+        
         # show the frame and record if the user presses a key
         if IMSHOW:
             cv2.imshow("Image", frame2show)
-        if DEBUG:
+        if config_parser.getboolean('debug', 'debug') :
             cv2.imshow("Thresh", thresh1)
             cv2.imshow("Blobs", thresh2)
             cv2.imshow("Frame Delta", frameDelta)
             cv2.imshow("Model", model)
             cv2.imshow("Gray", gray)
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(time_to_wait) & 0xFF
 
 
   #      rawCapture.truncate(0)
@@ -313,10 +352,18 @@ def md(path_to_video):
         if key == ord("q"):
             break
 
+        debug_end_time = time.time()
+        debug_time = debug_end_time - start_time
+
+        if config_parser.getboolean('debug', 'print_time') :
+            print("--- total: {:.4f}: algo({:.4f}), pre({:.3f}), md({:.3f}), trk({:.3f})".format(debug_time, algo_time, pre_time, md_time, trk_time))
+            
+
     # cleanup the camera and close any open windows
     camera.release()
     cv2.destroyAllWindows()
 
+    
 
 if __name__ == '__main__':
         ap = argparse.ArgumentParser()

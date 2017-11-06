@@ -10,7 +10,7 @@ if WIDE_RANGE: # Wide scene parameters
 
   
     #Detection:
-    ABSDIFF_THRESHOLD = 25
+    ABSDIFF_THRESHOLD = 50#25
     PERSON_ASPECT_RATIO = 1.2
     ALPHA_BLENDING = 0.00
     CLOSING_KERNEL = (10, 15)

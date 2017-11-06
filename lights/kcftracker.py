@@ -1,12 +1,21 @@
 import numpy as np 
 import cv2
-
-import ip_configuration as IP
+from configparser import ConfigParser
+#import ip_configuration as IP
 
 #import fhog
 
+#Globals
+config_filename = 'config.ini'
+config_parser = None
 
 
+def get_config():
+	global config_parser
+	config_parser = ConfigParser()
+	config_parser.read(config_filename)
+
+	
 # ffttools
 def fftd(img, backwards=False):	
 	# shape of img can be (m,n), (m,n,1) or (m,n,2)	
@@ -93,9 +102,12 @@ def subwindow(img, window, borderType=cv2.BORDER_CONSTANT):
 # KCF tracker
 class KCFTracker:
 	def __init__(self, hog=False, fixed_window=True, multiscale=False):
+
+                get_config()
+                        
 		self.lambdar = 0.0001   # regularization
-		self.padding = IP.TRACKER_SEARCH_WINDOW #2.5   # extra area surrounding the target
-		self.output_sigma_factor = IP.TRACKER_SIGMA_FACTOR #0.125   # bandwidth of gaussian target
+		self.padding = config_parser.getfloat('tracker', 'window_padding') #2.5   # extra area surrounding the target
+		self.output_sigma_factor = config_parser.getfloat('tracker', 'sigma_factor') #0.125   # bandwidth of gaussian target
 
 		#idan 28.10
 		self.bad_tracking_ctr = 0
@@ -109,8 +121,8 @@ class KCFTracker:
 			self.cell_size = 4   # HOG cell size
 			self._hogfeatures = True
 		else:  # raw gray-scale image # aka CSK tracker
-			self.interp_factor = IP.TRACKER_INTERP_FACTOR # 0.075
-			self.sigma = IP.TRACKER_SIGMA # 0.2
+			self.interp_factor = config_parser.getfloat('tracker', 'interp_factor')# 0.075
+			self.sigma = config_parser.getfloat('tracker', 'sigma') # 0.2
 			self.cell_size = 1
 			self._hogfeatures = False
 
