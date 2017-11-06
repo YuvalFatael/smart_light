@@ -108,10 +108,12 @@ class KCFTracker:
 		self.lambdar = 0.0001   # regularization
 		self.padding = config_parser.getfloat('tracker', 'window_padding') #2.5   # extra area surrounding the target
 		self.output_sigma_factor = config_parser.getfloat('tracker', 'sigma_factor') #0.125   # bandwidth of gaussian target
-
+                self.min_movement = config_parser.getint('tracker', 'min_movement')
+                self.nonmoving_lifetime = config_parser.getint('tracker', 'nonmoving_lifetime')
+                
 		#idan 28.10
-		self.bad_tracking_ctr = 0
-		self.is_bad_tracking = False
+		self.not_moving_ctr = 0
+		self.is_not_moving = False
 
 		if(hog):  # HOG feature
 			# VOT
@@ -323,14 +325,15 @@ class KCFTracker:
 				self._roi[2] *= self.scale_step
 				self._roi[3] *= self.scale_step
 
-		#idan 28.10
-		# if peak_value < 0.55:
-		# 	self.bad_tracking_ctr += 1
-		# else:
-		# 	self.bad_tracking_ctr = 0
-        #
-		# if self.bad_tracking_ctr > 3:
-		# 	self.is_bad_tracking = True
+		#idan
+				
+		if loc[0] < self.min_movement and loc[1] < self.min_movement:
+		 	self.not_moving_ctr += 1
+		else:
+		 	self.not_moving_ctr = 0
+                if self.not_moving_ctr > self.nonmoving_lifetime:
+		 	self.is_not_moving = True
+		
 
 		self._roi[0] = cx - self._roi[2]/2.0 + loc[0]*self.cell_size*self._scale
 		self._roi[1] = cy - self._roi[3]/2.0 + loc[1]*self.cell_size*self._scale
@@ -361,5 +364,5 @@ class KCFTracker:
 	def getVelocity(self): 
                 return self._dist / self._age
 
-	# def isTrackingBad(self):
-	# 	return self.is_bad_tracking
+	def isNotMoving(self):
+	 	return self.is_not_moving

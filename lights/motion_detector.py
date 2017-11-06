@@ -101,13 +101,14 @@ def md(path_to_video):
     model = None
     hh = config_parser.getint('detection', 'closing_kernel_height')
     ww = config_parser.getint('detection', 'closing_kernel_width')
+    sub_sampling = config_parser.getint('motion', 'sub_sampling')
     kernel = np.ones((ww,hh), np.uint8)
     flagRight = flagLeft = False
     max_time = -1
     
 
-    cv2.namedWindow('Image', cv2.WINDOW_NORMAL)
-    time.sleep(0.25)
+    cv2.namedWindow("Image")
+    
     # if the video argument is None, then we are reading from webcam
     if path_to_video is None:
         camera = cv2.VideoCapture(0)
@@ -132,7 +133,7 @@ def md(path_to_video):
 
         # grab the current frame
 
-        for repeat in range (1,3):
+        for repeat in range (1,sub_sampling-1):
             camera.read()
 
         (grabbed, frame) = camera.read()
@@ -209,6 +210,11 @@ def md(path_to_video):
             # if a tracker got into the frame edges, remove it.
             # in addition, raise a movement flag about the relevant direction (left or right)
         for t in trackers:
+
+            if t.isNotMoving():
+                trackers.remove(t)
+                continue
+            
             boundingbox = t.getPos()
             if do_resize:
                 boundingbox = [boundingbox[0]*2, boundingbox[1]*2, boundingbox[2]*2, boundingbox[3]*2]
@@ -224,6 +230,7 @@ def md(path_to_video):
                 
                 delta_alpha = speed / config_parser.getint('motion', 'image_width') * config_parser.getfloat('motion', 'camera_fov')
                 speedMetersPerFrame = 2 * config_parser.getfloat('motion', 'camera_distance') * np.tan(np.radians(2*delta_alpha))
+                speedMeterPerSecond = speedMetersPerFrame * config_parser.getfloat('motion', 'frames_per_sec')
                                                                                           
                # print "speed is : {}".format(speed)
                                                                                           
@@ -292,37 +299,26 @@ def md(path_to_video):
         ### 6) Display
         ################################################################################################################
         SAVE_EVENTS = config_parser.get('motion', 'save_events')
-        SAVE_FULL_FRAME = True
-        if flagLeft:
+
+        if flagLeft or flagRight:
+            
             if IMSHOW:
-                cv2.putText(frame2show, "Motion Left, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 30),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            # TODO: send message to left neighbours
+                cv2.putText(frame2show, "Motion Right, speed: {:.3f} m/sec".format(speedMeterPerSecond), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                cv2.putText(frame2show, "ID: {} ".format(device_id), (5, 15),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+            if flagLeft:
+                image_filename = time.strftime("%Y%m%d-%H%M%S") + '-left.jpg'
+                light.motion_detected('Left', image_filename, speedMeterPerSecond)
+
+            if flagRight:
+                image_filename = time.strftime("%Y%m%d-%H%M%S") + '-right.jpg'
+                light.motion_detected('Right', image_filename, speedMeterPerSecond)
+                
             if SAVE_EVENTS:
-                if not SAVE_FULL_FRAME:
-                    # Crop image
-                    imCrop = cropRoi(frame2show, left_roi)
-                else:
-                    imCrop = frame2show
-                image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-left.jpg'
-                cv2.imwrite(image_fliename, imCrop)
-                light.motion_detected('Left', image_fliename, 0)
-        if flagRight:
-            if IMSHOW:
-                cv2.putText(frame2show, "Motion Right, speed: {:.3f} m/frame".format(speedMetersPerFrame), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            # TODO: send message to right neighbour
-            if SAVE_EVENTS:
-                if not SAVE_FULL_FRAME:
-                    # Crop image
-                    imCrop = cropRoi(frame2show, right_roi)
-                else:
-                    imCrop = frame2show
-                image_fliename = time.strftime("%Y%m%d-%H%M%S") + '-right.jpg'
-                cv2.imwrite(image_fliename, imCrop)
-                light.motion_detected('Right', image_fliename, 0)
+                    cv2.imwrite(image_filename, frame2show)
+        
 
-        cv2.putText(frame2show, "ID: {} ".format(device_id), (5, 15),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-
-
+        
 
 
         
@@ -332,7 +328,7 @@ def md(path_to_video):
         time_to_wait = 166 - int(algo_time*1000)
         if time_to_wait <= 0:
             time_to_wait = 1
-        print time_to_wait
+        #print time_to_wait
         
         # show the frame and record if the user presses a key
         if IMSHOW:
@@ -343,11 +339,10 @@ def md(path_to_video):
             cv2.imshow("Frame Delta", frameDelta)
             cv2.imshow("Model", model)
             cv2.imshow("Gray", gray)
+
+
         key = cv2.waitKey(time_to_wait) & 0xFF
-
-
-  #      rawCapture.truncate(0)
-
+        
         # if the `q` key is pressed, break from the lop
         if key == ord("q"):
             break
@@ -358,7 +353,8 @@ def md(path_to_video):
         if config_parser.getboolean('debug', 'print_time') :
             print("--- total: {:.4f}: algo({:.4f}), pre({:.3f}), md({:.3f}), trk({:.3f})".format(debug_time, algo_time, pre_time, md_time, trk_time))
             
-
+        #rawCapture.truncate(0)
+            
     # cleanup the camera and close any open windows
     camera.release()
     cv2.destroyAllWindows()
