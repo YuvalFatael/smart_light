@@ -236,7 +236,7 @@ def md(path_to_video, cb):
 
 				delta_alpha = speed / config_parser.getint('motion', 'image_width') * config_parser.getfloat('motion',
 																											 'camera_fov')
-				speedMetersPerFrame = 2 * config_parser.getfloat('motion', 'camera_distance') * np.tan(
+				speedMetersPerFrame = config_parser.getfloat('motion', 'camera_distance') * np.tan(
 					np.radians(2 * delta_alpha))
 				speedMeterPerSecond = speedMetersPerFrame * config_parser.getfloat('motion', 'frames_per_sec')
 
