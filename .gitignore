@@ -1,2 +1,6 @@
 */certs/*
 testing/*
+lights/videos/*
+lights/images/*
+lights/config.ini
+*/*.pyc
