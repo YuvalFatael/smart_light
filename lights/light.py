@@ -25,7 +25,6 @@ deadline_factor = None
 network_devices = {}  # 'id': {'id': device_id, 'location': device_location, 'time': device_update_time}
 network_motions = {}  # 'motion_id': {'id': motion_id, 'direction': 'motion_direction', 'deadline': motion_deadline_time}
 send_control_lock = threading.Lock()
-network_motions_lock = threading.Lock()
 config_filename = 'config.ini'
 imgur_client = None
 config_parser = None
@@ -84,6 +83,7 @@ def motion_message_handler(client, userdata, message):
 					motion_direction == 'Left' and my_location - sender_location < 0):
 		motion_deadline = get_motion_deadline(message_device_id, float(motion_speed))
 		motion_info = {'id': motion_id,
+					   'time': time.time(),
 					   'direction': motion_direction,
 					   'deadline': motion_deadline}
 		network_motions[motion_id] = motion_info
@@ -113,7 +113,6 @@ def motion_detected(direction, speed, image_filename):
 		print('direction: {}, image_filename: {}'.format(direction, image_filename))
 	else:
 		# We are expecting a motion
-		network_motions_lock.acquire()
 		if len(network_motions) > 0:
 			motion = None
 			for motion_event in network_motions.values():
@@ -131,7 +130,6 @@ def motion_detected(direction, speed, image_filename):
 		# New motion
 		else:
 			motion_id = id_generator()
-		network_motions_lock.release()
 		# neighbor_id = network_neighbors[direction]
 		# Upload Img and Send motion event
 		if config_parser.getboolean('imgur', 'upload_img'):
