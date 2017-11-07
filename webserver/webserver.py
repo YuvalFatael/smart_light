@@ -53,18 +53,21 @@ def control_message_handler(client, userdata, message):
 
 def motion_message_handler(client, userdata, message):
 	motion_msg = message.payload.decode("utf-8").split(
-		',')  # Motion message structure: 'deviceID,motionID,motion_direction,motion_speed'
+		',')  # Motion message structure: 'deviceID,motionID,motion_direction,motion_speed,img_url'
 	message_device_id = motion_msg[0]
 	motion_id = motion_msg[1]
 	motion_direction = motion_msg[2]
 	motion_speed = motion_msg[3]
+	img_url = motion_msg[4]
 
 	# Create Motion event
 	update_time = time.time()
 	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
 	event = {'id': message_device_id,
-			 'event': '{} detected motion id: {}, direction: {}, speed: {}'.format(message_device_id, motion_id,
-																				   motion_direction, motion_speed),
+			 'event': '{} detected motion id: {}, direction: {}, speed: {}, img: {}'.format(message_device_id,
+																							motion_id,
+																							motion_direction,
+																							motion_speed, img_url),
 			 'time': update_time,
 			 'time_str': update_time_str}
 	network_events.append(event)

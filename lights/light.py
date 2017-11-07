@@ -124,9 +124,15 @@ def motion_detected(direction, speed, image_filename):
 		else:
 			motion_id = id_generator()
 
+		# Upload Img
+		uploaded_image = imgur_client.upload_image(image_filename, title="motion")
+
 		# Send motion event
 		# neighbor_id = network_neighbors[direction]
-		send_motion(motion_id, direction, speed)
+		if config_parser.getboolean('imgur', 'upload_img'):
+			send_motion(motion_id, direction, speed, uploaded_image.link)
+		else:
+			send_motion(motion_id, direction, speed)
 
 
 '''
@@ -210,9 +216,10 @@ def send_control():
 	logger.debug('%s sent control with location: %s', device_id, device_location)
 
 
-def send_motion(motion_id, motion_direction, motion_speed):
+def send_motion(motion_id, motion_direction, motion_speed, img_url=None):
 	try:
-		myMQTTClient.publish("motion", "{},{},{},{}".format(device_id, motion_id, motion_direction, motion_speed), 1)
+		myMQTTClient.publish("motion",
+							 "{},{},{},{},{}".format(device_id, motion_id, motion_direction, motion_speed, img_url), 1)
 	except publishTimeoutException:
 		logger.error('%s got TIMEOUT', device_id)
 	logger.debug('%s sent motion id: %s direction: %s speed: %s', device_id, motion_id, motion_direction, motion_speed)
@@ -336,6 +343,7 @@ def main(video=None, kill=None):
 
 	time.sleep(kill)
 	os._exit(1)
+
 
 if __name__ == '__main__':
 	video, kill = get_argparser_video()
