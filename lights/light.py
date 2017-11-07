@@ -260,7 +260,7 @@ def imgur_connect():
 def get_motion_deadline(sender_device_id, motion_speed):
 	distance = abs(int(network_devices[sender_device_id]['location']) - int(get_location()))
 	deadline_time = distance / abs(motion_speed) * deadline_factor
-	return deadline_time
+	return time.time() + deadline_time
 
 
 def generate_motion_for_debug(video_filename_path):
