@@ -3,7 +3,8 @@ import time
 import logging
 import datetime
 import pyimgur
-#import motion_detector
+import argparse
+import motion_detector
 import string
 import random
 from configparser import ConfigParser
@@ -104,6 +105,7 @@ def alert_message_handler(client, userdata, message):
 
 
 def motion_detected(direction, speed, image_filename):
+        global myMQTTClient
 	if myMQTTClient is None:  # For debugging
 		print('direction: {}, image_filename: {}'.format(direction, image_filename))
 	else:
@@ -256,10 +258,9 @@ def get_motion_deadline(sender_device_id, motion_speed):
 	return time.time() + abs(10 * (int(network_devices[sender_device_id]['location']) - int(get_location())))
 
 
-def generate_motion_for_debug():
-	time.sleep(5)
-	send_motion(id_generator(), 'Right', 10)
-
+def generate_motion_for_debug(video_filename_path):
+	motion_detector.md(video_filename_path)
+	
 
 def get_config():
 	global config_parser, device_id, device_location, control_timer, cleanup_margin
@@ -282,7 +283,14 @@ def get_logger():
 	logger.setLevel(logging.DEBUG)
 
 
-def main():
+def get_argparser_video():
+        ap = argparse.ArgumentParser()
+        ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
+        args = ap.parse_args()
+        return args.video[0]
+
+
+def main(path_to_video=None):
 	# Get Config and General Parameters
 	get_config()
 
@@ -314,13 +322,14 @@ def main():
 
 	# Create Image processing thread for Debug
 	if config_parser.getboolean('motion', 'run_video') is True:
-		threading.Thread(target=generate_motion_for_debug).start()
+		threading.Thread(target=motion_detector.md, args=[video, motion_detected]).start()
 		#image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 		#image_processing_thread.start()
-
-	while True:
-		pass
+        
+        while True:
+                pass
 
 
 if __name__ == '__main__':
-	main()
+        video = get_argparser_video()
+	main(video)
