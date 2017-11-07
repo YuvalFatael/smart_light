@@ -321,7 +321,7 @@ def md(path_to_video, cb):
 				cv2.imwrite(image_filename_path, frame2show)
 
 			speedMeterPerSecond = float('{:.3f}'.format(speedMeterPerSecond))
-			threading.Thread(target=cb, args=[direction, speedMeterPerSecond), image_filename_path]).start()
+			threading.Thread(target=cb, args=[direction, speedMeterPerSecond, image_filename_path]).start()
 
 		algo_end_time = time.time()
 		algo_time = algo_end_time - start_time
