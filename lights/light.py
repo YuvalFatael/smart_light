@@ -7,6 +7,7 @@ import argparse
 import motion_detector
 import string
 import random
+import os
 from configparser import ConfigParser
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from AWSIoTPythonSDK.exception.AWSIoTExceptions import publishTimeoutException
@@ -292,11 +293,12 @@ def get_logger():
 def get_argparser_video():
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
+	ap.add_argument("-k", "--kill", help="kill time", nargs=1)
 	args = ap.parse_args()
-	return args.video[0]
+	return args.video[0], args.kill[0]
 
 
-def main(path_to_video=None):
+def main(video=None, kill=None):
 	# Get Config and General Parameters
 	get_config()
 
@@ -332,9 +334,9 @@ def main(path_to_video=None):
 	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 	# image_processing_thread.start()
 
-	time.sleep(40)
-	exit(-1)
+	time.sleep(kill)
+	os._exit(1)
 
 if __name__ == '__main__':
-	video = get_argparser_video()
-	main(video)
+	video, kill = get_argparser_video()
+	main(video, kill)
