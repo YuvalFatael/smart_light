@@ -179,7 +179,7 @@ def cleanup_network_thread_func():
 def send_control_thread_func():
 	global control_timestamp
 	while True:
-		time.sleep(4)
+		time.sleep(1)
 		if time.time() - control_timestamp >= control_timer:
 			logger.debug('%s sending control from send_control_thread', device_id)
 			threading.Thread(target=send_control).start()
@@ -187,7 +187,7 @@ def send_control_thread_func():
 
 def check_motion_thread_func():
 	while True:
-		time.sleep(5)
+		time.sleep(1)
 		for iter_motion_id in list(network_motions):
 			motion = network_motions[iter_motion_id]
 			if motion['deadline'] < time.time():
@@ -326,9 +326,6 @@ def main(path_to_video=None):
 		threading.Thread(target=motion_detector.md, args=[video, motion_detected]).start()
 	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 	# image_processing_thread.start()
-
-	while True:
-		pass
 
 
 if __name__ == '__main__':
