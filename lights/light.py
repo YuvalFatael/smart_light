@@ -339,4 +339,4 @@ def main(video=None, kill=None):
 
 if __name__ == '__main__':
 	video, kill = get_argparser_video()
-	main(video, kill)
+	main(video, float(kill))
