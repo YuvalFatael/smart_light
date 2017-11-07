@@ -118,10 +118,15 @@ def motion_detected(direction, speed, image_filename):
 			for motion_event in network_motions.values():
 				if motion_event['direction'] != direction:
 					continue
-				if motion is None or motion['time'] > motion_event['time']:
+				if motion is None:
 					motion = motion_event
-			motion_id = motion['id']
-			del network_motions[motion_id]
+				elif motion['time'] > motion_event['time']:
+					motion = motion_event
+			if motion is None:
+				motion_id = id_generator()
+			else:
+				motion_id = motion['id']
+				del network_motions[motion_id]
 		# New motion
 		else:
 			motion_id = id_generator()
