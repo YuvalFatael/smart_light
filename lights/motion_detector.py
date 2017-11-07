@@ -320,7 +320,7 @@ def md(path_to_video, cb):
 				image_filename_path = os.path.join('images', image_filename + '-{}.jpg'.format(direction))
 				cv2.imwrite(image_filename_path, frame2show)
 
-			speedMeterPerSecond = float('{:.3f}'.format(speedMeterPerSecond)
+			speedMeterPerSecond = float('{:.3f}'.format(speedMeterPerSecond))
 			threading.Thread(target=cb, args=[direction, speedMeterPerSecond), image_filename_path]).start()
 
 		algo_end_time = time.time()
