@@ -116,6 +116,8 @@ def motion_detected(direction, speed, image_filename):
 		if len(network_motions) > 0:
 			motion = None
 			for motion_event in network_motions.values():
+				if motion_event['direction'] != direction:
+					continue
 				if motion is None or motion['time'] > motion_event['time']:
 					motion = motion_event
 			motion_id = motion['id']
