@@ -19,7 +19,8 @@ control_timestamp = None
 device_id = None
 device_location = None
 control_timer = None
-cleanup_margin = None  # number of control_timer times
+cleanup_factor = None  # number of control_timer times
+deadline_factor = None
 # network_neighbors = {'Left': '', 'Right': ''}
 network_devices = {}  # 'id': {'id': device_id, 'location': device_location, 'time': device_update_time}
 network_motions = {}  # 'motion_id': {'id': motion_id, 'direction': 'motion_direction', 'deadline': motion_deadline_time}
@@ -85,7 +86,8 @@ def motion_message_handler(client, userdata, message):
 					   'direction': motion_direction,
 					   'deadline': motion_deadline}
 		network_motions[motion_id] = motion_info
-		logger.debug('%s added motion %s direction: %s deadline: %s', device_id, motion_id, motion_direction,
+		logger.debug('%s recived motion from: %s id: %s direction: %s deadline: %s', device_id, message_device_id,
+					 motion_id, motion_direction,
 					 datetime.datetime.fromtimestamp(motion_deadline).strftime('%d/%m/%Y %H:%M:%S'))
 
 
@@ -161,7 +163,7 @@ def cleanup_network_devices():
 	# flag = 0
 	for iter_device_id in list(network_devices):
 		network_device_update_time = network_devices[iter_device_id]['time']
-		if time.time() - network_device_update_time > control_timer * cleanup_margin:
+		if time.time() - network_device_update_time > control_timer * cleanup_factor:
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
 		#		flag = 1
@@ -256,7 +258,9 @@ def imgur_connect():
 
 
 def get_motion_deadline(sender_device_id, motion_speed):
-	return time.time() + abs(10 * (int(network_devices[sender_device_id]['location']) - int(get_location())))
+	distance = abs(int(network_devices[sender_device_id]['location']) - int(get_location()))
+	deadline_time = distance / abs(motion_speed) * deadline_factor
+	return deadline_time
 
 
 def generate_motion_for_debug(video_filename_path):
@@ -264,13 +268,14 @@ def generate_motion_for_debug(video_filename_path):
 
 
 def get_config():
-	global config_parser, device_id, device_location, control_timer, cleanup_margin
+	global config_parser, device_id, device_location, control_timer, cleanup_factor, deadline_factor
 	config_parser = ConfigParser()
 	config_parser.read(config_filename)
 	device_id = config_parser.get('light', 'device_id')
 	device_location = config_parser.getint('light', 'device_location')
 	control_timer = config_parser.getint('light', 'control_timer')
-	cleanup_margin = config_parser.getint('light', 'cleanup_margin')
+	cleanup_factor = config_parser.getint('light', 'cleanup_factor')
+	deadline_factor =  config_parser.getint('light', 'deadline_factor')
 
 
 def get_logger():
@@ -322,7 +327,7 @@ def main(path_to_video=None):
 	motion_check_thread.start()
 
 	# Create Image processing thread for Debug
-	if config_parser.getboolean('motion', 'run_video') is True:
+	if config_parser.getboolean('light', 'run_video') is True:
 		threading.Thread(target=motion_detector.md, args=[video, motion_detected]).start()
 	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 	# image_processing_thread.start()
