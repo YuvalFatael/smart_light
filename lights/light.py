@@ -274,8 +274,8 @@ def get_config():
 	device_id = config_parser.get('light', 'device_id')
 	device_location = config_parser.getint('light', 'device_location')
 	control_timer = config_parser.getint('light', 'control_timer')
-	cleanup_factor = config_parser.getint('light', 'cleanup_factor')
-	deadline_factor =  config_parser.getint('light', 'deadline_factor')
+	cleanup_factor = config_parser.getfloat('light', 'cleanup_factor')
+	deadline_factor = config_parser.getfloat('light', 'deadline_factor')
 
 
 def get_logger():
