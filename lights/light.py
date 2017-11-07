@@ -332,6 +332,8 @@ def main(path_to_video=None):
 	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 	# image_processing_thread.start()
 
+	time.sleep(40)
+	exit(-1)
 
 if __name__ == '__main__':
 	video = get_argparser_video()
