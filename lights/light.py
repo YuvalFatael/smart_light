@@ -131,12 +131,10 @@ def motion_detected(direction, speed, image_filename):
 		else:
 			motion_id = id_generator()
 
-		# Upload Img
-		uploaded_image = imgur_client.upload_image(image_filename, title="motion")
-
-		# Send motion event
 		# neighbor_id = network_neighbors[direction]
+		# Upload Img and Send motion event
 		if config_parser.getboolean('imgur', 'upload_img'):
+			uploaded_image = imgur_client.upload_image(image_filename, title="motion")
 			send_motion(motion_id, direction, speed, uploaded_image.link)
 		else:
 			send_motion(motion_id, direction, speed)
