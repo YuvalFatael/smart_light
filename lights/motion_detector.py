@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import time
 import kcftracker
+import os
 #import ip_configuration as IP
 from picamera.array import PiRGBArray
 import light
@@ -314,7 +315,7 @@ def md(path_to_video):
                 light.motion_detected('Right', image_filename, speedMeterPerSecond)
                 
             if SAVE_EVENTS:
-                    cv2.imwrite(image_filename, frame2show)
+                    cv2.imwrite(os.path.join('images', image_filename), frame2show)
         
 
         
