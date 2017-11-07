@@ -105,7 +105,7 @@ def alert_message_handler(client, userdata, message):
 
 
 def motion_detected(direction, speed, image_filename):
-        global myMQTTClient
+	global myMQTTClient
 	if myMQTTClient is None:  # For debugging
 		print('direction: {}, image_filename: {}'.format(direction, image_filename))
 	else:
@@ -260,7 +260,7 @@ def get_motion_deadline(sender_device_id, motion_speed):
 
 def generate_motion_for_debug(video_filename_path):
 	motion_detector.md(video_filename_path)
-	
+
 
 def get_config():
 	global config_parser, device_id, device_location, control_timer, cleanup_margin
@@ -284,10 +284,10 @@ def get_logger():
 
 
 def get_argparser_video():
-        ap = argparse.ArgumentParser()
-        ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
-        args = ap.parse_args()
-        return args.video[0]
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
+	args = ap.parse_args()
+	return args.video[0]
 
 
 def main(path_to_video=None):
@@ -323,13 +323,13 @@ def main(path_to_video=None):
 	# Create Image processing thread for Debug
 	if config_parser.getboolean('motion', 'run_video') is True:
 		threading.Thread(target=motion_detector.md, args=[video, motion_detected]).start()
-		#image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
-		#image_processing_thread.start()
-        
-        while True:
-                pass
+	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
+	# image_processing_thread.start()
+
+	while True:
+		pass
 
 
 if __name__ == '__main__':
-        video = get_argparser_video()
+	video = get_argparser_video()
 	main(video)
