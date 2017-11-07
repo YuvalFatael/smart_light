@@ -1,5 +1,4 @@
 AWSIoTPythonSDK
 pyimgur
 ConfigParser
-opencv-python
 numpy
