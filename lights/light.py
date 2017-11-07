@@ -116,6 +116,7 @@ def motion_detected(direction, speed, image_filename):
 				if motion is None or motion['time'] > motion_event['time']:
 					motion = motion_event
 			motion_id = motion['id']
+			del network_motions[motion_id]
 		# New motion
 		else:
 			motion_id = id_generator()
@@ -178,7 +179,7 @@ def cleanup_network_thread_func():
 def send_control_thread_func():
 	global control_timestamp
 	while True:
-		time.sleep(1)
+		time.sleep(4)
 		if time.time() - control_timestamp >= control_timer:
 			logger.debug('%s sending control from send_control_thread', device_id)
 			threading.Thread(target=send_control).start()
@@ -186,7 +187,7 @@ def send_control_thread_func():
 
 def check_motion_thread_func():
 	while True:
-		time.sleep(1)
+		time.sleep(5)
 		for iter_motion_id in list(network_motions):
 			motion = network_motions[iter_motion_id]
 			if motion['deadline'] < time.time():
