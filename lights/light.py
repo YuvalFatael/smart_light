@@ -81,7 +81,7 @@ def motion_message_handler(client, userdata, message):
 	# If the motion is coming to us
 	if (motion_direction == 'Right' and my_location - sender_location > 0) or (
 					motion_direction == 'Left' and my_location - sender_location < 0):
-		motion_deadline = get_motion_deadline(message_device_id, motion_speed)
+		motion_deadline = get_motion_deadline(message_device_id, float(motion_speed))
 		motion_info = {'id': motion_id,
 					   'direction': motion_direction,
 					   'deadline': motion_deadline}
