@@ -21,7 +21,6 @@ device_location = None
 control_timer = None
 cleanup_factor = None  # number of control_timer times
 deadline_factor = None
-# network_neighbors = {'Left': '', 'Right': ''}
 network_devices = {}  # 'id': {'id': device_id, 'location': device_location, 'time': device_update_time}
 network_motions = {}  # 'motion_id': {'id': motion_id, 'direction': 'motion_direction', 'deadline': motion_deadline_time}
 send_control_lock = threading.Lock()
@@ -59,9 +58,6 @@ def control_message_handler(client, userdata, message):
 						   'time': update_time}
 	network_devices[message_device_id] = message_device_info
 	# Check if network devices should be updated
-	'''if old_message_device_info is None or old_message_device_info['location'] != message_device_location:
-		# Update Neighbors
-		update_neighbors()'''
 
 
 def motion_message_handler(client, userdata, message):
@@ -130,44 +126,12 @@ def motion_detected(direction, speed, image_filename):
 		# New motion
 		else:
 			motion_id = id_generator()
-		# neighbor_id = network_neighbors[direction]
 		# Upload Img and Send motion event
 		if config_parser.getboolean('imgur', 'upload_img'):
 			uploaded_image = imgur_client.upload_image(image_filename, title="motion")
 			send_motion(motion_id, direction, speed, uploaded_image.link)
 		else:
 			send_motion(motion_id, direction, speed)
-
-
-'''
-def update_neighbors():
-	right_neighbor = None
-	left_neighbor = None
-	right_neighbor_distance = 0
-	left_neighbor_distance = 0
-	for device in network_devices.values():
-		network_device_id = device['id']
-		network_device_location = device['location']
-		distance = float(get_location()) - float(network_device_location)
-		if distance < 0 and right_neighbor_distance == 0:
-			right_neighbor_distance = distance
-			right_neighbor = (network_device_id, distance)
-		elif distance > 0 and left_neighbor_distance == 0:
-			left_neighbor_distance = distance
-			left_neighbor = (network_device_id, distance)
-		elif 0 > distance > right_neighbor_distance:
-			right_neighbor_distance = distance
-			right_neighbor = (network_device_id, distance)
-		elif 0 < distance < left_neighbor_distance:
-			left_neighbor_distance = distance
-			left_neighbor = (network_device_id, distance)
-
-	network_neighbors['Right'] = right_neighbor
-	logger.debug('%s set right_neighbor %s', device_id, right_neighbor)
-
-	network_neighbors['Left'] = left_neighbor
-	logger.debug('%s set left_neighbor %s', device_id, left_neighbor)
-'''
 
 
 def cleanup_network_devices():
@@ -177,10 +141,6 @@ def cleanup_network_devices():
 		if time.time() - network_device_update_time > control_timer * cleanup_factor:
 			del network_devices[iter_device_id]
 			logger.debug('%s removed offline device %s', device_id, iter_device_id)
-		#		flag = 1
-
-		# if flag == 1:
-		#	update_neighbors()
 
 
 def cleanup_network_thread_func():
@@ -309,7 +269,7 @@ def get_argparser_video():
 	return args.video[0], args.kill[0]
 
 
-def main(video=None, kill=None):
+def main(video_path=None, kill_time=None):
 	# Get Config and General Parameters
 	get_config()
 
@@ -341,12 +301,13 @@ def main(video=None, kill=None):
 
 	# Create Image processing thread for Debug
 	if config_parser.getboolean('light', 'run_video') is True:
-		threading.Thread(target=motion_detector.md, args=[video, motion_detected]).start()
+		threading.Thread(target=motion_detector.md, args=[video_path, motion_detected]).start()
 	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
 	# image_processing_thread.start()
 
-	time.sleep(kill)
-	os._exit(1)
+	if kill_time:
+		time.sleep(kill_time)
+		os._exit(1)
 
 
 if __name__ == '__main__':
