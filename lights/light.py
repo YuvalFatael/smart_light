@@ -4,7 +4,7 @@ import logging
 import datetime
 import pyimgur
 import argparse
-import motion_detector
+from motion_detector import md
 import string
 import random
 import os
@@ -126,8 +126,7 @@ def motion_detected(direction, speed, image_filename):
 			motion_id = id_generator()
 		# Upload Img and Send motion event
 		if config_parser.getboolean('imgur', 'upload_img'):
-			uploaded_image = imgur_client.upload_image(image_filename, title="motion")
-			uploaded_image.link
+			threading.Thread(target=upload_image, args=[motion_id, image_filename]).start()
 
 		# Send motion message
 		send_motion(motion_id, direction, speed)
@@ -196,6 +195,14 @@ def send_alert(motion_id):
 	logger.debug('%s sent alert on motion_id: %s', device_id, motion_id)
 
 
+def send_image(motion_id, image_link):
+	try:
+		myMQTTClient.publish("image", "{},{},{}".format(device_id, motion_id, image_link), 1)
+	except publishTimeoutException:
+		logger.error('%s got TIMEOUT', device_id)
+	logger.debug('%s sent image on motion_id: %s, link: %s', device_id, motion_id, image_link)
+
+
 def get_location():  # TODO: implement location function
 	return device_location
 
@@ -226,6 +233,12 @@ def imgur_connect():
 	global imgur_client
 	imgur_client_id = config_parser.get('imgur', 'imgur_client_id')
 	imgur_client = pyimgur.Imgur(imgur_client_id)
+
+
+def upload_image(motion_id, image_filename):
+	uploaded_image = imgur_client.upload_image(image_filename, title="motion")
+	image_link = uploaded_image.link
+	send_image(motion_id, image_link)
 
 
 def get_motion_deadline(sender_device_id, motion_speed):
@@ -259,9 +272,15 @@ def get_logger():
 def get_argparser_video():
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
-	ap.add_argument("-k", "--kill", help="kill time", nargs=1)
+	ap.add_argument("-k", "--kill", help="kill time", nargs=1, type=float)
 	args = ap.parse_args()
-	return args.video[0], args.kill[0]
+	video_path = None
+	kill_time = None
+	if args.video is not None:
+		video_path = args.video[0]
+	if args.kill is not None:
+		kill_time = args.kill[0]
+	return video_path, kill_time
 
 
 def main(video_path=None, kill_time=None):
@@ -296,7 +315,7 @@ def main(video_path=None, kill_time=None):
 
 	# Create Image processing thread for Debug
 	if config_parser.getboolean('light', 'run_video') is True:
-		threading.Thread(target=motion_detector.md, args=[video_path, motion_detected]).start()
+		threading.Thread(target=md, args=[video_path, motion_detected]).start()
 
 	if kill_time:
 		time.sleep(kill_time)
@@ -305,4 +324,4 @@ def main(video_path=None, kill_time=None):
 
 if __name__ == '__main__':
 	video, kill = get_argparser_video()
-	main(video, float(kill))
+	main(video, kill)

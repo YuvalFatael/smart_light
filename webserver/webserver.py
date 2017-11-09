@@ -58,20 +58,21 @@ def motion_message_handler(client, userdata, message):
 	motion_id = motion_msg[1]
 	motion_direction = motion_msg[2]
 	motion_speed = motion_msg[3]
-	img_url = motion_msg[4]
 
 	# Create Motion event
 	update_time = time.time()
 	update_time_str = datetime.datetime.fromtimestamp(update_time).strftime('%d/%m/%Y %H:%M:%S')
 	event = {'id': message_device_id,
-			 'event': '{} detected motion id: {}, direction: {}, speed: {}, img: {}'.format(message_device_id,
-																							motion_id,
-																							motion_direction,
-																							motion_speed, img_url),
+			 'event': '{} detected motion id: {}, direction: {}, speed: {}'.format(message_device_id,
+																				   motion_id,
+																				   motion_direction,
+																				   motion_speed),
+			 'motion_id': motion_id,
 			 'time': update_time,
 			 'time_str': update_time_str}
 	network_events.append(event)
-	logger.debug('%s added motion: %s, %s, %s', device_id, motion_id, motion_direction, motion_speed)
+	logger.debug('%s added motion from %s: motion_id: %s, direction: %s, speed: %s', device_id, message_device_id,
+				 motion_id, motion_direction, motion_speed)
 
 
 def alert_message_handler(client, userdata, message):
@@ -88,6 +89,18 @@ def alert_message_handler(client, userdata, message):
 			 'time_str': update_time_str}
 	network_events.append(event)
 	logger.debug('%s alert on motion: %s', device_id, motion_id)
+
+
+def image_message_handler(client, userdata, message):
+	image_msg = message.payload.decode("utf-8").split(',')  # Image message structure: 'deviceID,motionID,imageLink'
+	message_device_id = image_msg[0]
+	motion_id = image_msg[1]
+	image_link = image_msg[2]
+	for event in network_events:
+		if event.get('id') == message_device_id and event.get('motion_id') == motion_id:
+			event['event'] += ', img: {}'.format(image_link)
+			logger.debug('%s added image to: %s, motion_id: %s, img_link: %s', device_id, message_device_id, motion_id,
+						 image_link)
 
 
 def cleanup_neighbors():
@@ -129,6 +142,7 @@ def mqtt_connect():
 	myMQTTClient.subscribe("control", 1, control_message_handler)
 	myMQTTClient.subscribe("motion", 1, motion_message_handler)
 	myMQTTClient.subscribe("alert", 1, alert_message_handler)
+	myMQTTClient.subscribe("image", 1, image_message_handler)
 
 
 @app.route("/clear")
