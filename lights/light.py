@@ -50,14 +50,12 @@ def control_message_handler(client, userdata, message):
 		logger.debug('%s sending control to new device %s', device_id, message_device_id)
 		threading.Thread(target=send_control).start()
 
-	old_message_device_info = network_devices.get(message_device_id)
 	# Update network devices
 	update_time = time.time()
 	message_device_info = {'id': message_device_id,
 						   'location': message_device_location,
 						   'time': update_time}
 	network_devices[message_device_id] = message_device_info
-	# Check if network devices should be updated
 
 
 def motion_message_handler(client, userdata, message):
@@ -129,9 +127,10 @@ def motion_detected(direction, speed, image_filename):
 		# Upload Img and Send motion event
 		if config_parser.getboolean('imgur', 'upload_img'):
 			uploaded_image = imgur_client.upload_image(image_filename, title="motion")
-			send_motion(motion_id, direction, speed, uploaded_image.link)
-		else:
-			send_motion(motion_id, direction, speed)
+			uploaded_image.link
+
+		# Send motion message
+		send_motion(motion_id, direction, speed)
 
 
 def cleanup_network_devices():
@@ -235,10 +234,6 @@ def get_motion_deadline(sender_device_id, motion_speed):
 	return time.time() + deadline_time
 
 
-def generate_motion_for_debug(video_filename_path):
-	motion_detector.md(video_filename_path)
-
-
 def get_config():
 	global config_parser, device_id, device_location, control_timer, cleanup_factor, deadline_factor
 	config_parser = ConfigParser()
@@ -302,8 +297,6 @@ def main(video_path=None, kill_time=None):
 	# Create Image processing thread for Debug
 	if config_parser.getboolean('light', 'run_video') is True:
 		threading.Thread(target=motion_detector.md, args=[video_path, motion_detected]).start()
-	# image_processing_thread = threading.Thread(target=motion_detector.md('in.avi'))
-	# image_processing_thread.start()
 
 	if kill_time:
 		time.sleep(kill_time)
