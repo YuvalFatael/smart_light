@@ -368,4 +368,4 @@ if __name__ == '__main__':
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-v", "--video", help="path to the video file", nargs=1)
 	args = ap.parse_args()
-	md(args.video[0])
+	md(args.video[0], None)
