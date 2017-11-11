@@ -25,7 +25,7 @@ config_filename = 'config.ini'
 def control_message_handler(client, userdata, message):
 	control_msg = message.payload.decode("utf-8").split(',')  # Control message structure: 'deviceID,deviceLocation'
 	message_device_id = control_msg[0]
-	message_device_location = control_msg[1]
+	message_device_location = float(control_msg[1])
 
 	# Got the control message I sent
 	if message_device_id == device_id:
